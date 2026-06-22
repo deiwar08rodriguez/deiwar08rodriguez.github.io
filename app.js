@@ -2,22 +2,21 @@ console.log("ThermoAir JS cargado");
 
 
 const URL_PRODUCTOS =
-"https://1drv.ms/x/c/376564bb9ea4de16/IQAxTXPJfd6lTaNuf1aw5aPEAWAAkS2uOjX74J6Vi3iLl2s?e=Sm3knd";
+"https://1drv.ms/download?resid=376564bb9ea4de16%21IQAxTXPJfd6lTaNuf1aw5aPEAWAAkS2uOjX74J6Vi3iLl2s";
 
 
 const URL_BUSES =
-"https://1drv.ms/x/c/376564bb9ea4de16/IQBhE3hkdl3qQ4FzEZoYzx6PAWGud5Ej6XyPayl8Q6gNW0s?e=YQDoOf";
+"https://1drv.ms/download?resid=376564bb9ea4de16%21IQBhE3hkdl3qQ4FzEZoYzx6PAWGud5Ej6XyPayl8Q6gNW0s";
 
 
 const URL_SALIDAS =
-"https://1drv.ms/x/c/376564bb9ea4de16/IQDtbTAMInMDQa_qa5I6xF3VAUiUfJk8urO3Mv0_83Br11E?e=67qobz";
+"https://1drv.ms/download?resid=376564bb9ea4de16%21IQDtbTAMInMDQa_qa5I6xF3VAUiUfJk8urO3Mv0_83Br11E";
 
 
 let datosActuales = [];
 
 
 async function cargarCSV(url){
-
 
     console.log("Cargando:", url);
 
@@ -31,13 +30,15 @@ async function cargarCSV(url){
     console.log(texto);
 
 
-    const filas = texto.split("\n");
+    const filas = texto.split(/\r?\n/);
 
 
-    const encabezados = filas[0].split(",");
+    const encabezados = filas[0]
+    .split(",")
+    .map(x=>x.replace(/"/g,""));
 
 
-    let datos = [];
+    let datos=[];
 
 
     for(let i=1;i<filas.length;i++){
@@ -46,7 +47,8 @@ async function cargarCSV(url){
         if(filas[i].trim()=="") continue;
 
 
-        const valores = filas[i].split(",");
+        const valores =
+        filas[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
 
 
         let fila={};
@@ -54,8 +56,12 @@ async function cargarCSV(url){
 
         encabezados.forEach((campo,index)=>{
 
-            fila[campo.replace(/"/g,"")] =
-            valores[index]?.replace(/"/g,"") || "";
+
+            fila[campo]=
+            valores?.[index]
+            ?.replace(/^"|"$/g,"")
+            || "";
+
 
         });
 
@@ -66,10 +72,11 @@ async function cargarCSV(url){
     }
 
 
-    datosActuales = datos;
+    datosActuales=datos;
 
 
     mostrar(datos);
+
 
 }
 
@@ -84,17 +91,21 @@ function mostrar(datos){
     datos.forEach(item=>{
 
 
-        html += `
+        html+=`
 
         <div class="card">
 
-        ${Object.keys(item).map(campo=>`
+        ${
+        Object.keys(item)
+        .map(campo=>`
 
         <b>${campo}</b>:
         ${item[campo]}
         <br>
 
-        `).join("")}
+        `)
+        .join("")
+        }
 
         </div>
 
@@ -104,18 +115,18 @@ function mostrar(datos){
     });
 
 
-    document.getElementById("resultado").innerHTML = html;
+
+    document.getElementById("resultado").innerHTML=html;
 
 
 }
 
 
 
+
 function mostrarBuses(){
 
-console.log("boton buses");
-
-cargarCSV(URL_BUSES);
+    cargarCSV(URL_BUSES);
 
 }
 
@@ -123,9 +134,7 @@ cargarCSV(URL_BUSES);
 
 function mostrarProductos(){
 
-console.log("boton productos");
-
-cargarCSV(URL_PRODUCTOS);
+    cargarCSV(URL_PRODUCTOS);
 
 }
 
@@ -133,11 +142,10 @@ cargarCSV(URL_PRODUCTOS);
 
 function mostrarSalidas(){
 
-console.log("boton salidas");
-
-cargarCSV(URL_SALIDAS);
+    cargarCSV(URL_SALIDAS);
 
 }
+
 
 
 
@@ -145,7 +153,10 @@ function buscar(){
 
 
     let texto =
-    document.getElementById("buscar").value.toLowerCase();
+    document.getElementById("buscar")
+    .value
+    .toLowerCase();
+
 
 
     let filtrado =
@@ -158,7 +169,9 @@ function buscar(){
     );
 
 
+
     mostrar(filtrado);
+
 
 
 }
