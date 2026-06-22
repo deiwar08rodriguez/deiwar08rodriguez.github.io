@@ -1,5 +1,9 @@
+console.log("ThermoAir JS cargado");
+
+
 const URL_PRODUCTOS =
 "https://1drv.ms/x/c/376564bb9ea4de16/IQAxTXPJfd6lTaNuf1aw5aPEAWAAkS2uOjX74J6Vi3iLl2s?e=Sm3knd";
+
 
 const URL_BUSES =
 "https://1drv.ms/x/c/376564bb9ea4de16/IQBhE3hkdl3qQ4FzEZoYzx6PAWGud5Ej6XyPayl8Q6gNW0s?e=YQDoOf";
@@ -9,91 +13,98 @@ const URL_SALIDAS =
 "https://1drv.ms/x/c/376564bb9ea4de16/IQDtbTAMInMDQa_qa5I6xF3VAUiUfJk8urO3Mv0_83Br11E?e=67qobz";
 
 
-let datos=[];
-
+let datosActuales = [];
 
 
 async function cargarCSV(url){
 
 
-let respuesta = await fetch(url);
+    console.log("Cargando:", url);
 
 
-let texto = await respuesta.text();
+    const respuesta = await fetch(url);
 
 
-let filas = texto.split("\n");
+    const texto = await respuesta.text();
 
 
-let cabeceras =
-filas[0].split(",");
+    console.log(texto);
 
 
-
-let resultado=[];
-
-
-for(let i=1;i<filas.length;i++){
+    const filas = texto.split("\n");
 
 
-let valores =
-filas[i].split(",");
+    const encabezados = filas[0].split(",");
 
 
-let objeto={};
+    let datos = [];
 
 
-cabeceras.forEach((x,j)=>{
-
-objeto[x]=valores[j];
-
-});
+    for(let i=1;i<filas.length;i++){
 
 
-resultado.push(objeto);
+        if(filas[i].trim()=="") continue;
 
+
+        const valores = filas[i].split(",");
+
+
+        let fila={};
+
+
+        encabezados.forEach((campo,index)=>{
+
+            fila[campo.replace(/"/g,"")] =
+            valores[index]?.replace(/"/g,"") || "";
+
+        });
+
+
+        datos.push(fila);
+
+
+    }
+
+
+    datosActuales = datos;
+
+
+    mostrar(datos);
 
 }
 
 
-datos=resultado;
+
+function mostrar(datos){
 
 
-mostrar(datos);
+    let html="";
 
 
-}
+    datos.forEach(item=>{
 
 
+        html += `
 
-function mostrar(lista){
+        <div class="card">
 
+        ${Object.keys(item).map(campo=>`
 
-let html="";
+        <b>${campo}</b>:
+        ${item[campo]}
+        <br>
 
+        `).join("")}
 
-lista.forEach(x=>{
+        </div>
 
-
-html += `
-
-<div class="card">
-
-${Object.entries(x).map(([a,b])=>`
-
-<b>${a}</b>: ${b}<br>
-
-`).join("")}
-
-</div>
-
-`;
+        `;
 
 
-});
+    });
 
 
-document.getElementById("resultado").innerHTML=html;
+    document.getElementById("resultado").innerHTML = html;
 
 
 }
@@ -102,19 +113,27 @@ document.getElementById("resultado").innerHTML=html;
 
 function mostrarBuses(){
 
+console.log("boton buses");
+
 cargarCSV(URL_BUSES);
 
 }
 
 
+
 function mostrarProductos(){
+
+console.log("boton productos");
 
 cargarCSV(URL_PRODUCTOS);
 
 }
 
 
+
 function mostrarSalidas(){
+
+console.log("boton salidas");
 
 cargarCSV(URL_SALIDAS);
 
@@ -122,26 +141,24 @@ cargarCSV(URL_SALIDAS);
 
 
 
-
 function buscar(){
 
 
-let texto =
-document.getElementById("buscar").value.toUpperCase();
+    let texto =
+    document.getElementById("buscar").value.toLowerCase();
 
 
+    let filtrado =
+    datosActuales.filter(x=>
 
-let filtrado =
-datos.filter(x=>
+        JSON.stringify(x)
+        .toLowerCase()
+        .includes(texto)
 
-JSON.stringify(x)
-.toUpperCase()
-.includes(texto)
-
-);
+    );
 
 
-mostrar(filtrado);
+    mostrar(filtrado);
 
 
 }
