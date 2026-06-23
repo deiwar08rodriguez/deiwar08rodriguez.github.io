@@ -1,6 +1,5 @@
 console.log("ThermoAir JS cargado");
 
-
 const URL_PRODUCTOS = "./Recursos/productos.csv";
 
 const URL_BUSES = "./Recursos/buses.csv";
