@@ -1,171 +1,46 @@
-console.log("ThermoAir JS cargado");
+const SUPABASE_URL =
+"https://vdlxmajvzdtbewchyowm.supabase.co/rest/v1/";
 
-const URL_PRODUCTOS = "./Recursos/productos.csv";
+const SUPABASE_KEY =
+"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkbHhtYWp2emR0YmV3Y2h5b3dtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyMTQwNzAsImV4cCI6MjA5Nzc5MDA3MH0.Lkd6dAfeItdxPS-rEiruHDB36-1GDE6I_0ogR7TuhFM";
 
-const URL_BUSES = "./Recursos/buses.csv";
+const supabaseClient =
+supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+);
 
-const URL_SALIDAS = "./Recursos/salidas_bodega.csv";
+async function cargarBuses(){
 
+    const { data, error } =
+    await supabaseClient
+        .from("buses")
+        .select("*")
+        .limit(100);
 
-let datosActuales = [];
+    if(error){
 
-
-async function cargarCSV(url){
-
-    console.log("Cargando:", url);
-
-
-    const respuesta = await fetch(url);
-
-
-    const texto = await respuesta.text();
-
-
-    console.log(texto);
-
-
-    const filas = texto.split(/\r?\n/);
-
-
-    const encabezados = filas[0]
-    .split(",")
-    .map(x=>x.replace(/"/g,""));
-
-
-    let datos=[];
-
-
-    for(let i=1;i<filas.length;i++){
-
-
-        if(filas[i].trim()=="") continue;
-
-
-        const valores =
-        filas[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
-
-
-        let fila={};
-
-
-        encabezados.forEach((campo,index)=>{
-
-
-            fila[campo]=
-            valores?.[index]
-            ?.replace(/^"|"$/g,"")
-            || "";
-
-
-        });
-
-
-        datos.push(fila);
-
-
+        console.error(error);
+        return;
     }
 
+    const tabla =
+    document.getElementById("tablaBuses");
 
-    datosActuales=datos;
+    tabla.innerHTML = "";
 
+    data.forEach(bus=>{
 
-    mostrar(datos);
-
-
-}
-
-
-
-function mostrar(datos){
-
-
-    let html="";
-
-
-    datos.forEach(item=>{
-
-
-        html+=`
-
-        <div class="card">
-
-        ${
-        Object.keys(item)
-        .map(campo=>`
-
-        <b>${campo}</b>:
-        ${item[campo]}
-        <br>
-
-        `)
-        .join("")
-        }
-
-        </div>
-
+        tabla.innerHTML += `
+        <tr>
+            <td>${bus.id}</td>
+            <td>${bus.bus}</td>
+            <td>${bus.placa}</td>
+            <td>${bus.cliente}</td>
+        </tr>
         `;
-
-
     });
 
-
-
-    document.getElementById("resultado").innerHTML=html;
-
-
 }
 
-
-
-
-function mostrarBuses(){
-
-    cargarCSV(URL_BUSES);
-
-}
-
-
-
-function mostrarProductos(){
-
-    cargarCSV(URL_PRODUCTOS);
-
-}
-
-
-
-function mostrarSalidas(){
-
-    cargarCSV(URL_SALIDAS);
-
-}
-
-
-
-
-function buscar(){
-
-
-    let texto =
-    document.getElementById("buscar")
-    .value
-    .toLowerCase();
-
-
-
-    let filtrado =
-    datosActuales.filter(x=>
-
-        JSON.stringify(x)
-        .toLowerCase()
-        .includes(texto)
-
-    );
-
-
-
-    mostrar(filtrado);
-
-
-
-}
+cargarBuses();

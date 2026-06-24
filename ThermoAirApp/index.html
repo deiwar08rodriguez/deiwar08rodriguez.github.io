@@ -1,87 +1,55 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="es">
 <head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Buses ThermoAir</title>
 
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<title>ThermoAir</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
-
 body{
-font-family:Arial;
-padding:20px;
-background:#f5f5f5;
+    font-family: Arial, sans-serif;
+    margin:40px;
 }
 
-button{
-width:100%;
-padding:15px;
-margin:5px;
-font-size:18px;
-border-radius:10px;
-border:0;
-background:#222;
-color:white;
+table{
+    border-collapse: collapse;
+    width:100%;
 }
 
-input{
-width:100%;
-padding:12px;
-font-size:16px;
-margin-top:10px;
+th,td{
+    border:1px solid #ccc;
+    padding:8px;
 }
 
-.card{
-
-background:white;
-padding:15px;
-margin-top:10px;
-border-radius:10px;
-
+th{
+    background:#f3f3f3;
 }
-
 </style>
 
-
 </head>
-
-
 <body>
 
+<h1>Buses registrados</h1>
 
-<h1>ThermoAir</h1>
+<table>
 
+<thead>
+<tr>
+<th>ID</th>
+<th>BUS</th>
+<th>PLACA</th>
+<th>CLIENTE</th>
+</tr>
+</thead>
 
-<button onclick="mostrarBuses()">
-🚌 Buses abiertos
-</button>
+<tbody id="tablaBuses">
+</tbody>
 
-
-<button onclick="mostrarProductos()">
-📦 Productos
-</button>
-
-
-<button onclick="mostrarSalidas()">
-📤 Salidas bodega
-</button>
-
-
-<input id="buscar"
-placeholder="Buscar..."
-onkeyup="buscar()">
-
-
-<div id="resultado"></div>
-
-
+</table>
 
 <script src="app.js"></script>
 
-
 </body>
-
-
 </html>
