@@ -3,48 +3,96 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Buses ThermoAir</title>
+
+<title>ThermoAir Inventario</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
+
+*{
+    box-sizing:border-box;
+}
+
 body{
-    font-family: Arial, sans-serif;
-    margin:40px;
+    font-family:Segoe UI, Arial, sans-serif;
+    margin:20px;
+}
+
+h1{
+    margin-bottom:20px;
+}
+
+#txtBuscar{
+    width:100%;
+    padding:12px;
+    font-size:16px;
+    margin-bottom:20px;
 }
 
 table{
-    border-collapse: collapse;
     width:100%;
-}
-
-th,td{
-    border:1px solid #ccc;
-    padding:8px;
+    border-collapse:collapse;
+    font-size:14px;
 }
 
 th{
-    background:#f3f3f3;
+    background:#e9ecef;
+    text-align:left;
+    padding:10px;
+    border:1px solid #d0d0d0;
+    position:sticky;
+    top:0;
 }
+
+td{
+    padding:10px;
+    border:1px solid #d0d0d0;
+}
+
+tr:hover{
+    background:#f7f7f7;
+}
+
+.stock{
+    text-align:center;
+}
+
+.precio{
+    text-align:right;
+}
+
 </style>
 
 </head>
+
 <body>
 
-<h1>Buses registrados</h1>
+<h1>Inventario ThermoAir</h1>
+
+<input
+    type="text"
+    id="txtBuscar"
+    placeholder="Buscar por código, descripción, proveedor, categoría..."
+>
 
 <table>
 
 <thead>
 <tr>
-<th>ID</th>
-<th>BUS</th>
-<th>PLACA</th>
-<th>CLIENTE</th>
+<th>CÓDIGO</th>
+<th>CATEGORÍA</th>
+<th>SUBCATEGORÍA</th>
+<th>DESCRIPCIÓN</th>
+<th>STOCK</th>
+<th>PROVEEDOR</th>
+<th>PRECIO COMPRA</th>
+<th>PRECIO VENTA</th>
+<th>CÓDIGO PROV</th>
 </tr>
 </thead>
 
-<tbody id="tablaBuses">
+<tbody id="tablaProductos">
 </tbody>
 
 </table>
