@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Inventario | ThermoAir</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+
+    background:#203764;
+    font-family:Calibri, "Segoe UI", Arial, sans-serif;
+    color:#1f2937;
+
+}
+
+header{
+
+    height:80px;
+
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+
+    padding:0 35px;
+
+    color:white;
+
+}
+
+.logo-area{
+
+    display:flex;
+    align-items:center;
+
+}
+
+.logo{
+
+    height:42px;
+
+    width:auto;
+
+}
+
+.separador{
+
+    width:2px;
+
+    height:38px;
+
+    background:rgba(255,255,255,.35);
+
+    margin-left:18px;
+    margin-right:18px;
+
+}
+
+.modulo{
+
+    color:white;
+
+    font-size:30px;
+
+    font-style:italic;
+
+    font-weight:normal;
+
+}
+
+header h1{
+
+    font-size:34px;
+    font-style:italic;
+    font-weight:normal;
+
+}
+
+header a{
+
+    color:white;
+    text-decoration:none;
+    font-size:18px;
+
+}
+
+header a:hover{
+
+    text-decoration:underline;
+
+}
+
+main{
+
+    margin:0 25px 25px 25px;
+
+    background:white;
+
+    border-radius:16px;
+
+    padding:30px;
+
+    box-shadow:0 18px 45px rgba(0,0,0,.25);
+
+}
+
+h2{
+
+    color:#203764;
+
+    margin-bottom:24px;
+
+    font-size:34px;
+
+    font-weight:normal;
+
+}
+
+#txtBuscar{
+
+    width:100%;
+
+    padding:16px 22px;
+
+    font-size:17px;
+
+    border:2px solid #d2d9e6;
+
+    border-radius:10px;
+
+    margin-bottom:25px;
+
+    outline:none;
+
+    transition:.20s;
+
+}
+
+#txtBuscar:focus{
+
+    border-color:#203764;
+
+    box-shadow:0 0 0 4px rgba(32,55,100,.15);
+
+}
+
+.table-container{
+
+    border-radius:10px;
+
+    overflow:auto;
+
+    border:1px solid #d7dde8;
+
+    max-height:75vh;
+
+}
+
+table{
+
+    width:100%;
+
+    border-collapse:collapse;
+
+    font-size:14px;
+
+}
+
+thead th{
+
+    background:#284B87;
+
+    color:white;
+
+    padding:14px;
+
+    position:sticky;
+
+    top:0;
+
+    text-align:left;
+
+    white-space:nowrap;
+
+    z-index:20;
+
+    font-size:14px;
+
+    letter-spacing:.5px;
+
+}
+
+tbody td{
+
+    padding:12px 14px;
+
+    border-bottom:1px solid #e6ebf2;
+
+}
+
+tbody tr:nth-child(even){
+
+    background:#fafbfc;
+
+}
+
+tbody tr:hover{
+
+    background:#dfe9ff;
+
+    transition:.15s;
+
+}
+
+.stock{
+
+    text-align:center;
+    font-weight:bold;
+
+}
+
+.precio{
+
+    text-align:right;
+
+    font-family:Consolas, monospace;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<header>
+
+<div class="logo-area">
+
+<img
+src="Logo/imagotipo_blanco.svg"
+alt="ThermoAir"
+class="logo"
+>
+
+<div class="separador"></div>
+
+<div class="modulo">
+Gestión
+</div>
+
+</div>
+
+<a href="index.html">
+← Menú principal
+</a>
+
+</header>
+
+<main>
+
+<h2>Productos</h2>
+
+<input
+type="text"
+id="txtBuscar"
+placeholder="Buscar por código, categoría, subcategoría, descripción, proveedor o código proveedor..."
+>
+
+<div class="table-container">
+
+<table>
+
+<thead>
+
+<tr>
+
+<th>CÓDIGO</th>
+<th>CATEGORÍA</th>
+<th>SUBCATEGORÍA</th>
+<th>DESCRIPCIÓN</th>
+<th>STOCK</th>
+<th>PROVEEDOR</th>
+<th>PRECIO COMPRA</th>
+<th>PRECIO VENTA</th>
+<th>CÓDIGO PROV</th>
+
+</tr>
+
+</thead>
+
+<tbody id="tablaProductos">
+</tbody>
+
+</table>
+
+</div>
+
+</main>
+
+<script src="productos.js"></script>
+
+</body>
+
+</html>

@@ -1,65 +1,105 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>ThermoAir Inventario</title>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<title>ThermoAir S.A.S</title>
 
 <style>
 
 *{
+    margin:0;
+    padding:0;
     box-sizing:border-box;
 }
 
 body{
-    font-family:Segoe UI, Arial, sans-serif;
-    margin:20px;
+
+    background:#203764;
+
+    height:100vh;
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+
+    font-family:Calibri, Arial, sans-serif;
+
+}
+
+.contenedor{
+
+    text-align:center;
+
+}
+
+.logo-principal{
+
+    width:460px;
+
+    max-width:90vw;
+
+    margin-bottom:70px;
+
 }
 
 h1{
-    margin-bottom:20px;
+
+    color:white;
+
+    font-size:54px;
+
+    font-style:italic;
+
+    margin-bottom:60px;
+
+    font-weight:normal;
+
 }
 
-#txtBuscar{
-    width:100%;
-    padding:12px;
-    font-size:16px;
-    margin-bottom:20px;
+.menu{
+
+    display:flex;
+
+    justify-content:center;
+
+    gap:25px;
+
 }
 
-table{
-    width:100%;
-    border-collapse:collapse;
-    font-size:14px;
+.boton{
+
+    display:inline-block;
+
+    width:220px;
+
+    padding:18px;
+
+    background:white;
+
+    color:#203764;
+
+    text-decoration:none;
+
+    font-size:22px;
+
+    font-weight:bold;
+
+    border-radius:10px;
+
+    transition:.25s;
+
 }
 
-th{
-    background:#e9ecef;
-    text-align:left;
-    padding:10px;
-    border:1px solid #d0d0d0;
-    position:sticky;
-    top:0;
-}
+.boton:hover{
 
-td{
-    padding:10px;
-    border:1px solid #d0d0d0;
-}
+    transform:translateY(-4px);
 
-tr:hover{
-    background:#f7f7f7;
-}
+    box-shadow:0 10px 20px rgba(0,0,0,.25);
 
-.stock{
-    text-align:center;
-}
-
-.precio{
-    text-align:right;
 }
 
 </style>
@@ -68,36 +108,28 @@ tr:hover{
 
 <body>
 
-<h1>Inventario ThermoAir</h1>
+<div class="contenedor">
 
-<input
-    type="text"
-    id="txtBuscar"
-    placeholder="Buscar por código, descripción, proveedor, categoría..."
+<img
+src="Logo/imagotipo_blanco.svg"
+alt="ThermoAir"
+class="logo-principal"
 >
 
-<table>
+<div class="menu">
 
-<thead>
-<tr>
-<th>CÓDIGO</th>
-<th>CATEGORÍA</th>
-<th>SUBCATEGORÍA</th>
-<th>DESCRIPCIÓN</th>
-<th>STOCK</th>
-<th>PROVEEDOR</th>
-<th>PRECIO COMPRA</th>
-<th>PRECIO VENTA</th>
-<th>CÓDIGO PROV</th>
-</tr>
-</thead>
+<a href="productos.html" class="boton">
+PRODUCTOS
+</a>
 
-<tbody id="tablaProductos">
-</tbody>
+<a href="buses.html" class="boton">
+BUSES
+</a>
 
-</table>
+</div>
 
-<script src="app.js"></script>
+</div>
 
 </body>
+
 </html>
