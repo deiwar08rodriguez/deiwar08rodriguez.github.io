@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Buses ThermoAir</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+body{
+    font-family: Arial, sans-serif;
+    margin:40px;
+}
+
+table{
+    border-collapse: collapse;
+    width:100%;
+}
+
+th,td{
+    border:1px solid #ccc;
+    padding:8px;
+}
+
+th{
+    background:#f3f3f3;
+}
+</style>
+
+</head>
+<body>
+
+<h1>Buses registrados</h1>
+
+<table>
+
+<thead>
+<tr>
+<th>ID</th>
+<th>BUS</th>
+<th>PLACA</th>
+<th>CLIENTE</th>
+</tr>
+</thead>
+
+<tbody id="tablaBuses">
+</tbody>
+
+</table>
+
+<script src="app.js"></script>
+
+</body>
+</html>
