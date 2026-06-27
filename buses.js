@@ -8,6 +8,17 @@ let listaSalidas = [];
 let mapaProductos = new Map(); // Optimización: Búsquedas instantáneas O(1)
 let timeoutBusqueda;
 
+// Función global para abrir la foto en grande (Modal)
+function abrirVisorImagen(urlFoto) {
+    if (!urlFoto) return; // Si no hay foto (es placeholder), no hace nada
+    const modal = document.getElementById('visorImagenModal');
+    const img = document.getElementById('imgVisorCompleto');
+    if (modal && img) {
+        img.src = urlFoto;
+        modal.style.display = 'flex';
+    }
+}
+
 function formatoMoneda(valor) {
     return Number(valor ?? 0).toLocaleString("es-CO", {
         style: "currency",
@@ -122,10 +133,11 @@ function renderizarBuses(datosBuses) {
             ? `<img src="${vehiculo.foto}" alt="Bus" class="bus-foto">` 
             : `<div class="bus-foto-placeholder">Bus</div>`;
 
+        // 🚀 MEJORA UX: Se agregó onclick con stopPropagation para el zoom de la imagen
         html += `
         <div class="bus-item" id="bus-${vehiculo.id}">
             <div class="bus-header" onclick="toggleAcordeonBuses('bus-${vehiculo.id}')">
-                <div class="bus-foto-wrapper">${imgHtml}</div>
+                <div class="bus-foto-wrapper" onclick="event.stopPropagation(); abrirVisorImagen('${vehiculo.foto}')">${imgHtml}</div>
                 <div class="bus-info-main">
                     <div class="bus-titulo">${vehiculo.bus ?? "Bus sin nombre"}</div>
                     <div class="bus-detalles-linea1">Placa: ${vehiculo.placa ?? "---"} &nbsp;|&nbsp; Cliente: ${vehiculo.cliente ?? "---"}</div>
