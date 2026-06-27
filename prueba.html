@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestion de Buses | ThermoAir</title>
+    <title>Servicio Técnico (Buses) | ThermoAir</title>
     <!-- SDK de Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -34,7 +34,7 @@
         .logo-area { display: flex; align-items: center; }
         .logo { height: 42px; width: auto; }
         .separador { width: 2px; height: 38px; background: rgba(255, 255, 255, .35); margin-left: 18px; margin-right: 18px; }
-        .modulo { color: white; font-size: 30px; font-style: italic; font-weight: normal; }
+        .modulo { color: white; font-size: 26px; font-style: italic; font-weight: normal; }
         header a { color: white; text-decoration: none; font-size: 18px; }
         header a:hover { text-decoration: underline; }
 
@@ -46,7 +46,8 @@
             box-shadow: 0 18px 45px rgba(0, 0, 0, .25);
         }
 
-        h2 { color: #203764; margin-bottom: 24px; font-size: 34px; font-weight: normal; }
+        h2 { color: #203764; margin-bottom: 5px; font-size: 34px; font-weight: normal; }
+        .bajada-titulo { color: #64748b; font-size: 15px; margin-bottom: 24px; }
 
         #txtBuscar {
             width: 100%;
@@ -85,7 +86,7 @@
 
         .bus-header {
             display: flex;
-            align-items: stretch; /* Estira la foto para que iguale la altura de la informacion */
+            align-items: stretch;
             cursor: pointer;
             user-select: none;
             position: relative;
@@ -97,7 +98,7 @@
         }
 
         .bus-foto-wrapper {
-            width: 110px; /* Ancho fijo estricto para simular relacion vertical */
+            width: 110px;
             min-height: 110px;
             background: #e2e8f0;
             display: flex;
@@ -113,14 +114,14 @@
         
         .bus-info-main { 
             flex-grow: 1; 
-            padding: 15px 45px 15px 15px; /* Espacio derecho protegido para que no tape la flecha */
+            padding: 15px 45px 15px 15px;
             display: flex;
             flex-direction: column;
             justify-content: center;
         }
 
         .bus-titulo { font-size: 19px; color: #1e3a8a; font-weight: bold; margin-bottom: 2px; }
-        .bus-detalles-linea1 { font-size: 13px; color: #3b82f6; margin-bottom: 4px; text-transform: uppercase; }
+        .bus-detalles-linea1 { font-size: 13px; color: #3b82f6; margin-bottom: 4px; text-transform: uppercase; font-weight: bold; }
         .bus-detalles-linea2 { font-size: 13px; font-weight: bold; color: #203764; }
 
         .bus-flecha { 
@@ -144,7 +145,7 @@
 
         .bus-item.abierto .bus-detalle-panel { display: block; }
 
-        /* Estilos de Tabla en PC con Hora y Recibe */
+        /* Estilos de Tabla en PC con Hora, Repuesto/Servicio y Recibe */
         .table-container {
             border-radius: 8px;
             overflow: auto;
@@ -159,11 +160,11 @@
         tbody tr:nth-child(even) { background: #fafbfc; }
         tbody tr:hover { background: #dfe9ff; transition: .15s; }
 
-        .col-codigo { font-weight: bold; color: #284B87; }
+        .col-fecha { width: 12%; }
+        .col-hora { width: 10%; }
         .col-descripcion { font-weight: bold; color: #1e3a8a; }
-        .col-recibe { color: #3b82f6; font-weight: bold; }
-        .cantidad { text-align: center; font-weight: bold; color: #284B87; }
-        .precio { text-align: right; font-family: Consolas, monospace; font-weight: bold; color: #203764; }
+        .col-recibe { color: #3b82f6; font-weight: bold; width: 18%; }
+        .cantidad { text-align: center; font-weight: bold; color: #284B87; width: 10%; }
 
         .panel-acciones { display: flex; justify-content: flex-end; margin-top: 15px; }
         
@@ -186,7 +187,7 @@
 
 
         /* 📱 =======================================================
-           ⚡ REGLAS DE ADAPTACIÓN PARA CELULAR (MENOS DE 768px)
+            ⚡ REGLAS DE ADAPTACIÓN PARA CELULAR (MENOS DE 768px)
            ======================================================= */
         @media (max-width: 768px) {
             body { background: white; }
@@ -199,7 +200,7 @@
 
             .logo { height: 32px; }
             .separador { height: 26px; margin-left: 10px; margin-right: 10px; }
-            .modulo { font-size: 20px; }
+            .modulo { font-size: 18px; }
             header a { font-size: 14px; }
 
             main {
@@ -210,14 +211,9 @@
                 background: white;
             }
 
-            h2 { font-size: 24px; margin-bottom: 15px; }
+            h2 { font-size: 24px; margin-bottom: 2px; }
+            .bajada-titulo { font-size: 13px; margin-bottom: 15px; }
             #txtBuscar { padding: 14px 18px; font-size: 16px; margin-bottom: 15px; }
-
-            /* Se remueven las reglas de apilado en bloque para mantener la foto vertical a la izquierda */
-            .bus-header {
-                position: relative;
-            }
-
 
             .bus-detalle-panel { padding: 12px 5px; }
 
@@ -240,23 +236,9 @@
                 position: relative;
             }
 
-            .salida-desc { font-size: 14px; font-weight: bold; color: #1e3a8a; margin-bottom: 2px; padding-right: 70px; }
-            .salida-sub { font-size: 11px; color: #3b82f6; text-transform: uppercase; }
-            .salida-precio { font-size: 15px; font-weight: bold; color: #203764; margin-top: 4px; }
+            .salida-desc { font-size: 14px; font-weight: bold; color: #1e3a8a; margin-bottom: 2px; padding-right: 20px; }
+            .salida-sub { font-size: 11px; color: #3b82f6; text-transform: uppercase; font-weight: bold; }
             
-            .salida-codigo-badge {
-                position: absolute;
-                top: 10px;
-                right: 10px;
-                background: #e2e8f0;
-                color: #284B87;
-                padding: 2px 6px;
-                border-radius: 4px;
-                font-size: 11px;
-                font-weight: bold;
-                border: 1px solid #cbd5e1;
-            }
-
             .salida-footer {
                 display: flex;
                 justify-content: space-between;
@@ -279,59 +261,63 @@
         <div class="logo-area">
             <img src="Logo/imagotipo_ThermoAir.svg" alt="ThermoAir" class="logo">
             <div class="separador"></div>
-            <div class="modulo">Gestión</div>
+            <div class="modulo">Servicio Técnico</div>
         </div>
         <a href="index_gestion.html">← Menú principal</a>
     </header>
 
-<main>
-        <h2>Monitoreo de Buses</h2>
+    <main>
+        <h2>Órdenes de Servicio (Buses)</h2>
+        <p class="bajada-titulo">Monitoreo de consumos, repuestos y mano de obra aplicados por vehículo.</p>
 
-        <input type="text" id="txtBuscar" placeholder="Buscar por bus, placa o cliente...">
+        <input type="text" id="txtBuscar" placeholder="Buscar por placa, número de bus o cliente...">
 
-        <div class="lista-buses" id="contenedorBuses"></div>
-    </main>
-
-    <button id="btnAbrirFlotante" style="position: fixed; bottom: 25px; right: 25px; width: 60px; height: 60px; background: #284B87; color: white; border: none; border-radius: 50%; font-size: 30px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.35); z-index: 999; display: flex; align-items: center; justify-content: center; transition: transform 0.2s;">
-        +
-    </button>
-
-    <div id="overlayFlotante" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; transition: opacity 0.3s ease;">
-        
-        <div id="hojaFlotante" style="position: fixed; bottom: -100%; left: 0; width: 100%; background: white; border-top-left-radius: 20px; border-top-right-radius: 20px; padding: 25px; box-shadow: 0 -5px 25px rgba(0,0,0,0.2); z-index: 1001; transition: bottom 0.3s cubic-bezier(0.1, 0.76, 0.55, 0.94); max-width: 600px; margin: 0 auto; right: 0;">
-            
-            <div id="btnCerrarFlotante" style="width: 50px; height: 5px; background: #cbd5e1; border-radius: 3px; margin: 0 auto 20px auto; cursor: pointer;"></div>
-            
-            <h3 style="color: #203764; margin-bottom: 20px; font-size: 20px; font-weight: bold; text-align: center;">Registrar Nuevo Bus</h3>
-            
-            <form id="frmNuevoBus" style="display: flex; flex-direction: column; gap: 18px;">
-                
-                <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px dashed #cbd5e1;">
-                    <input type="file" id="regFoto" accept="image/*" capture="environment" style="display: none;">
-                    
-                    <div onclick="document.getElementById('regFoto').click()" style="width: 90px; height: 90px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; border: 2px solid #284B87;">
-                        <img id="imgPreview" src="" style="display: none; width: 100%; height: 100%; object-fit: cover;">
-                        <span id="iconCamara" style="font-size: 32px;">📸</span>
+        <div class="lista-buses" id="contenedorBuses">
+            <!-- Ejemplo visual de cómo se renderiza un elemento desde JS acorde a tu backend -->
+            <!-- 
+            <div class="bus-item">
+                <div class="bus-header">
+                    <div class="bus-foto-wrapper">
+                        <span class="bus-foto-placeholder">Placa</span>
                     </div>
-                    <span style="font-size: 13px; color: #284B87; font-weight: bold; cursor: pointer;" onclick="document.getElementById('regFoto').click()">Tomar o subir foto</span>
+                    <div class="bus-info-main">
+                        <div class="bus-titulo">Bus 104 - Transipiales</div>
+                        <div class="bus-detalles-linea1">PLACA: XYZ-123</div>
+                        <div class="bus-detalles-linea2">Repuestos y servicios cargados a la orden</div>
+                    </div>
+                    <div class="bus-flecha">▼</div>
                 </div>
-
-                <div>
-                    <label style="display: block; font-size: 13px; font-weight: bold; color: #203764; margin-bottom: 5px;">Nombre del Bus</label>
-                    <input type="text" id="regBus" required placeholder="Ej. Bus 104 - Coomotor" style="width: 100%; padding: 14px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; font-size: 16px;">
+                <div class="bus-detalle-panel">
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                TR
+                                    <th class="col-fecha">Fecha</th>
+                                    <th class="col-dash">Hora</th>
+                                    <th class="col-descripcion">Descripción del Repuesto / Servicio</th>
+                                    <th class="col-cant">Cant.</th>
+                                    <th class="col-recibe">Técnico / Recibe</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>25/06/2026</td>
+                                    <td>09:15 AM</td>
+                                    <td>Mano de Obra - Carga de Gas Refrigerante R134a</td>
+                                    <td class="cantidad">1</td>
+                                    <td class="col-recibe">Carlos Mendoza</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="panel-acciones">
+                        <button class="btn-facturar">Proceder a Facturación</button>
+                    </div>
                 </div>
-
-                <div>
-                    <label style="display: block; font-size: 13px; font-weight: bold; color: #203764; margin-bottom: 5px;">Placa</label>
-                    <input type="text" id="regPlaca" required placeholder="Ej. XPZ789" style="width: 100%; padding: 14px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; font-size: 16px; text-transform: uppercase;">
-                </div>
-
-                <button type="submit" id="btnGuardarBus" style="background: #203764; color: white; border: none; padding: 15px; font-weight: bold; border-radius: 8px; cursor: pointer; font-size: 16px; margin-top: 10px; box-shadow: 0 4px 10px rgba(32, 55, 100, 0.2);">
-                    Guardar e Ingresar
-                </button>
-            </form>
+            </div>
+            -->
         </div>
-    </div>
+    </main>
 
     <script src="buses.js"></script>
 </body>

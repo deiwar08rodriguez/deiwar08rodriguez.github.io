@@ -2,134 +2,151 @@
 <html lang="es">
 
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso | ThermoAir</title>
 
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-<title>ThermoAir S.A.S</title>
+        body {
+            background: #203764;
+            font-family: Calibri, "Segoe UI", Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #1f2937;
+        }
 
-<style>
+        .login-card {
+            background: white;
+            width: 100%;
+            max-width: 400px;
+            border-radius: 16px;
+            padding: 40px 30px;
+            box-shadow: 0 18px 45px rgba(0, 0, 0, .35);
+            text-align: center;
+        }
 
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-}
+        .logo {
+            height: 48px;
+            width: auto;
+            margin-bottom: 15px;
+        }
 
-body{
+        h2 {
+            color: #203764;
+            font-size: 26px;
+            font-weight: normal;
+            margin-bottom: 25px;
+            font-style: italic;
+        }
 
-    background:#203764;
+        .form-group {
+            text-align: left;
+            margin-bottom: 20px;
+        }
 
-    height:100vh;
+        label {
+            display: block;
+            font-size: 15px;
+            font-weight: bold;
+            color: #284B87;
+            margin-bottom: 8px;
+        }
 
-    display:flex;
-    justify-content:center;
-    align-items:center;
+        input {
+            width: 100%;
+            padding: 14px 18px;
+            font-size: 16px;
+            border: 2px solid #d2d9e6;
+            border-radius: 10px;
+            outline: none;
+            transition: .20s;
+            color: #203764;
+        }
 
-    font-family:Calibri, Arial, sans-serif;
+        input:focus {
+            border-color: #203764;
+            box-shadow: 0 0 0 4px rgba(32, 55, 100, .15);
+        }
 
-}
+        .btn-ingresar {
+            width: 100%;
+            background: #284B87;
+            color: white;
+            border: none;
+            padding: 14px;
+            font-size: 17px;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background .2s;
+            margin-top: 10px;
+        }
 
-.contenedor{
+        .btn-ingresar:hover {
+            background: #203764;
+        }
 
-    text-align:center;
+        #mensajeError {
+            color: #dc2626;
+            font-size: 14px;
+            font-weight: bold;
+            margin-top: 15px;
+            display: none;
+        }
 
-}
+        /* 📱 Adaptación moderna para celulares con tarjeta flotante */
+        @media (max-width: 768px) {
+            body {
+                /* Mantenemos el fondo azul y el centrado perfecto */
+                background: #203764;
+                align-items: center; 
+                padding: 20px; /* Evita que la tarjeta toque el borde superior/inferior en pantallas muy bajas */
+            }
 
-.logo-principal{
-
-    width:460px;
-
-    max-width:90vw;
-
-    margin-bottom:70px;
-
-}
-
-h1{
-
-    color:white;
-
-    font-size:54px;
-
-    font-style:italic;
-
-    margin-bottom:60px;
-
-    font-weight:normal;
-
-}
-
-.menu{
-
-    display:flex;
-
-    justify-content:center;
-
-    gap:25px;
-
-}
-
-.boton{
-
-    display:inline-block;
-
-    width:220px;
-
-    padding:18px;
-
-    background:white;
-
-    color:#203764;
-
-    text-decoration:none;
-
-    font-size:22px;
-
-    font-weight:bold;
-
-    border-radius:10px;
-
-    transition:.25s;
-
-}
-
-.boton:hover{
-
-    transform:translateY(-4px);
-
-    box-shadow:0 10px 20px rgba(0,0,0,.25);
-
-}
-
-</style>
-
+            .login-card {
+                /* Usamos el 90% del ancho disponible para dejar márgenes elegantes a los lados */
+                width: 90%; 
+                /* Mantenemos las esquinas curvas y la sombra para dar volumen */
+                border-radius: 16px;
+                box-shadow: 0 15px 35px rgba(0, 0, 0, .4);
+                padding: 35px 20px;
+            }
+        }
+    </style>
 </head>
 
 <body>
 
-<div class="contenedor">
+    <div class="login-card">
+        <img src="Logo/imagotipo_ThermoAir_Azul.svg" alt="ThermoAir" class="logo">
+        <h2>Control de Acceso</h2>
 
-<img
-src="Logo/imagotipo_blanco.svg"
-alt="ThermoAir"
-class="logo-principal"
->
+        <form id="formLogin">
+            <div class="form-group">
+                <label for="txtUsuario">Usuario</label>
+                <input type="text" id="txtUsuario" required autocomplete="username">
+            </div>
 
-<div class="menu">
+            <div class="form-group">
+                <label for="txtContrasena">Contrasena</label>
+                <input type="password" id="txtContrasena" required autocomplete="current-password">
+            </div>
 
-<a href="productos.html" class="boton">
-PRODUCTOS
-</a>
+            <button type="submit" class="btn-ingresar">Ingresar</button>
+        </form>
 
-<a href="buses.html" class="boton">
-BUSES
-</a>
+        <div id="mensajeError">Usuario o contrasena incorrectos</div>
+    </div>
 
-</div>
-
-</div>
-
+    <script src="login.js"></script>
 </body>
 
 </html>

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Gerencia | ThermoAir</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #ffffff;
+            font-family: Calibri, "Segoe UI", Arial, sans-serif;
+            min-height: 100vh;
+            display: flex;
+        }
+
+        /* 🟦 CONTEXTO GLOBAL: CONTENEDOR DIVIDIDO */
+        .dashboard-container {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* 1. SECCIÓN DE MARCA (Fondo Azul) */
+        .brand-side {
+            flex: 1;
+            background: linear-gradient(135deg, #203764 0%, #17284b 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+        }
+
+        .logo-top {
+            width: 380px;
+            max-width: 85%;
+            height: auto;
+            margin-bottom: 20px;
+            filter: drop-shadow(0 4px 12px rgba(0,0,0,0.15));
+        }
+
+        .brand-side h1 {
+            color: white;
+            font-size: 32px;
+            font-style: italic;
+            font-weight: normal;
+            opacity: 0.9;
+            letter-spacing: 0.5px;
+        }
+
+        /* 2. SECCIÓN DE ACCESOS (Fondo Claro) */
+        .menu-side {
+            flex: 1.2;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 0 10%;
+            background: #f8fafc;
+        }
+
+        .menu-side h2 {
+            color: #203764;
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #64748b;
+            font-size: 16px;
+            margin-bottom: 40px;
+        }
+
+        /* Rejilla de Opciones en PC */
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 25px;
+        }
+
+        .tarjeta-opcion {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 35px 25px;
+            text-decoration: none;
+            display: flex;
+            flex-direction: column;
+            transition: all .25s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Contenedor del Icono */
+        .icon-wrapper {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            background: rgba(40, 75, 135, 0.08);
+            color: #284B87;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            transition: all .25s ease;
+        }
+
+        .icon-wrapper svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .tarjeta-opcion .titulo-btn {
+            color: #203764;
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        .tarjeta-opcion .desc-btn {
+            color: #64748b;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        /* Hover Activo en Computadora */
+        .tarjeta-opcion:hover {
+            transform: translateY(-5px);
+            border-color: #284B87;
+            box-shadow: 0 20px 25px -5px rgba(32, 55, 100, 0.1);
+        }
+
+        .tarjeta-opcion:hover .icon-wrapper {
+            background: #284B87;
+            color: white;
+        }
+
+        .tarjeta-opcion:hover .titulo-btn {
+            color: #284B87;
+        }
+
+
+        /* 📱 ADAPTACIÓN VERTICAL PARA CELULARES (Misma estructura, perfecta UX) */
+        @media (max-width: 900px) {
+            .dashboard-container {
+                flex-direction: column; /* Cambia a flujo vertical */
+            }
+
+            /* Mitad Superior: Marca (Mantiene el fondo azul premium) */
+            .brand-side {
+                flex: 1; /* Ocupa exactamente la mitad superior */
+                padding: 40px 20px;
+                text-align: center;
+            }
+
+            .logo-top {
+                width: 250px;
+                margin-bottom: 10px;
+            }
+
+            .brand-side h1 {
+                font-size: 22px;
+            }
+
+            /* Mitad Inferior: Botones (Mantiene el fondo claro texturizado) */
+            .menu-side {
+                flex: 1.4; /* Espacio cómodo para el pulgar y las tarjetas */
+                padding: 30px 24px;
+                background: #f8fafc;
+                justify-content: flex-start; /* Empuja las tarjetas hacia arriba */
+            }
+
+            .menu-side h2 {
+                font-size: 24px;
+                margin-bottom: 4px;
+            }
+
+            .subtitle {
+                font-size: 14px;
+                margin-bottom: 25px;
+            }
+
+            /* Reconfiguración de rejilla a lista en vertical */
+            .menu-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            /* Las tarjetas mantienen su diseño claro pero optimizadas para toque móvil */
+            .tarjeta-opcion {
+                padding: 20px;
+                flex-direction: row; /* Icono al lado del texto para mejor UX móvil */
+                align-items: center;
+                gap: 18px;
+                background: #ffffff;
+                border: 1px solid #e2e8f0;
+            }
+
+            .icon-wrapper {
+                margin-bottom: 0; /* Alineación horizontal perfecta */
+                width: 44px;
+                height: 44px;
+                flex-shrink: 0;
+            }
+
+            .tarjeta-opcion .titulo-btn {
+                font-size: 18px;
+                margin-bottom: 2px;
+            }
+
+            .tarjeta-opcion .desc-btn {
+                font-size: 13px;
+                line-height: 1.3;
+            }
+
+            /* Feedback de presión táctil */
+            .tarjeta-opcion:active {
+                background: #f1f5f9;
+                transform: scale(0.98);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="dashboard-container">
+        
+        <!-- PARTE AZUL: IDENTIDAD Y BRANDING -->
+        <div class="brand-side">
+            <img src="Logo/imagotipo_ThermoAir.svg" alt="ThermoAir" class="logo-top">
+            <h1>Panel de Gerencia</h1>
+        </div>
+
+        <!-- PARTE CLARA: ACCESOS Y OPERACIONES -->
+        <div class="menu-side">
+            <h2>Control de Gestión</h2>
+            <p class="subtitle">Seleccione el módulo del sistema que desea administrar.</p>
+
+            <div class="menu-grid">
+                
+                <!-- Tarjeta Productos -->
+                <a href="productos.html" class="tarjeta-opcion">
+                    <div class="icon-wrapper">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                    </div>
+                    <div>
+                        <div class="titulo-btn">PRODUCTOS</div>
+                        <div class="desc-btn">Control de stock, precios y proveedores.</div>
+                    </div>
+                </a>
+
+                <!-- Tarjeta Buses -->
+                <a href="buses.html" class="tarjeta-opcion">
+                    <div class="icon-wrapper">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                    </div>
+                    <div>
+                        <div class="titulo-btn">BUSES</div>
+                        <div class="desc-btn">Gestión de Buses En Servicio Técnico.</div>
+                    </div>
+                </a>
+
+            </div>
+        </div>
+
+    </div>
+
+</body>
+
+</html>
