@@ -2,494 +2,861 @@
 <html lang="es">
 
 <head>
-
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>Inventario | ThermoAir</title>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<style>
-
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-}
-
-body{
-
-    background:#203764;
-    font-family:Calibri, "Segoe UI", Arial, sans-serif;
-    color:#1f2937;
-
-}
-
-header{
-
-    height:80px;
-
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-
-    padding:0 35px;
-
-    color:white;
-
-}
-
-.logo-area{
-
-    display:flex;
-    align-items:center;
-
-}
-
-.logo{
-
-    height:42px;
-
-    width:auto;
-
-}
-
-.separador{
-
-    width:2px;
-
-    height:38px;
-
-    background:rgba(255,255,255,.35);
-
-    margin-left:18px;
-    margin-right:18px;
-
-}
-
-.modulo{
-
-    color:white;
-
-    font-size:30px;
-
-    font-style:italic;
-
-    font-weight:normal;
-
-}
-
-header h1{
-
-    font-size:34px;
-    font-style:italic;
-    font-weight:normal;
-
-}
-
-header a{
-
-    color:white;
-    text-decoration:none;
-    font-size:18px;
-
-}
-
-header a:hover{
-
-    text-decoration:underline;
-
-}
-
-main{
-
-    margin:0 25px 25px 25px;
-
-    background:white;
-
-    border-radius:16px;
-
-    padding:30px;
-
-    box-shadow:0 18px 45px rgba(0,0,0,.25);
-
-}
-
-h2{
-
-    color:#203764;
-
-    margin-bottom:24px;
-
-    font-size:34px;
-
-    font-weight:normal;
-
-}
-
-#txtBuscar{
-
-    width:100%;
-
-    padding:16px 22px;
-
-    font-size:17px;
-
-    border:2px solid #d2d9e6;
-
-    border-radius:10px;
-
-    margin-bottom:25px;
-
-    outline:none;
-
-    transition:.20s;
-
-}
-
-#txtBuscar:focus{
-
-    border-color:#203764;
-
-    box-shadow:0 0 0 4px rgba(32,55,100,.15);
-
-}
-
-.table-container{
-
-    border-radius:10px;
-
-    overflow:auto;
-
-    border:1px solid #d7dde8;
-
-    max-height:75vh;
-
-}
-
-table{
-
-    width:100%;
-
-    border-collapse:collapse;
-
-    font-size:14px;
-
-}
-
-thead th{
-
-    background:#284B87;
-
-    color:white;
-
-    padding:14px;
-
-    position:sticky;
-
-    top:0;
-
-    text-align:left;
-
-    white-space:nowrap;
-
-    z-index:20;
-
-    font-size:14px;
-
-    letter-spacing:.5px;
-
-}
-
-tbody td {
-    padding: 12px 14px;
-    border-bottom: 1px solid #e6ebf2;
-    color: #203764;
-}
-
-tbody tr:nth-child(even) {
-    background: #fafbfc;
-}
-
-tbody tr:hover {
-    background: #dfe9ff;
-    transition: .15s;
-}
-
-/* Clases de consistencia de color con la vista celular */
-.col-codigo {
-    font-weight: bold;
-    color: #284B87;
-}
-
-.col-subtexto {
-    color: #3b82f6;
-    font-weight: normal;
-    text-transform: uppercase;
-}
-
-.col-descripcion {
-    font-weight: bold;
-    color: #1e3a8a;
-}
-
-.stock {
-    text-align: center;
-    font-weight: bold;
-    color: #284B87;
-}
-
-/* Alerta roja para cuando el stock este en cero en la tabla de PC */
-.stock.sin-stock {
-    color: #dc2626;
-}
-
-.precio {
-    text-align: right;
-    font-family: Consolas, monospace;
-    font-weight: bold;
-    color: #203764;
-}
-
-
-/* El contenedor móvil se mantiene oculto en PC */
-.mobile-cards-container {
-    display: none;
-}
-
-/* 📱 =======================================================
-   ⚡ REGLAS DE ADAPTACIÓN PARA CELULAR (MENOS DE 768px)
-   ======================================================= */
-@media (max-width: 768px) {
-    body {
-        background: white; /* Quitamos el fondo azul general en móviles */
-    }
-
-    header {
-        background: #203764; /* La barra superior mantiene el color de la marca */
-        height: 65px;
-        padding: 0 15px;
-    }
-
-    .logo { height: 32px; }
-    .separador { height: 26px; margin-left: 10px; margin-right: 10px; }
-    .modulo { font-size: 20px; }
-    header a { font-size: 14px; }
-
-    /* CERO desperdicio lateral: Main ocupa todo el ancho táctil */
-    main {
-        margin: 0;
-        padding: 15px;
-        border-radius: 0;
-        box-shadow: none;
-        background: white;
-    }
-
-    h2 {
-        font-size: 24px;
-        margin-bottom: 15px;
-    }
-
-    #txtBuscar {
-        padding: 14px 18px;
-        font-size: 16px;
-        margin-bottom: 15px;
-    }
-
-    /* Ocultamos por completo la tabla de Excel para evitar desbordes */
-    .table-container {
-        display: none;
-    }
-
-    /* Activamos el contenedor de tarjetas verticales */
-    .mobile-cards-container {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-    }
-
-    /* Estilo para las tarjetas de consulta rápida */
-    .prod-card {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 14px;
-        display: flex;
-        flex-direction: column;
-        position: relative;
-    }
-
-    /* Texto principal en azul oscuro profundo */
-    .card-descripcion {
-        font-size: 16px;
-        font-weight: bold;
-        color: #1e3a8a;
-        line-height: 1.3;
-        padding-right: 90px; /* Evita que choque con el indicador de codigo puro */
-        margin-bottom: 4px;
-    }
-
-    /* Indicador de codigo en cuadrito con contorno donde antes estaba stock en azul corporativo */
-    .card-codigo-badge {
-        position: absolute;
-        top: 14px;
-        right: 14px;
-        background: #e2e8f0;
-        color: #284B87;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-size: 13px;
-        font-weight: bold;
-        border: 1px solid #cbd5e1;
-    }
-
-    /* Linea de categorias en azul medio suavizado */
-    .card-subtexto {
-        font-size: 12px;
-        color: #3b82f6;
-        margin-bottom: 8px;
-        text-transform: uppercase;
-    }
-
-
-    /* El precio en azul oscuro para lectura en carrera */
-    .card-precio-venta {
-        font-size: 22px;
-        font-weight: 800;
-        color: #203764;
-    }
-
-    /* Panel expandible con los datos tecnicos de la oficina en azul oscuro sin grises */
-    .card-detalles-ocultos {
-        display: none;
-        margin-top: 10px;
-        padding-top: 10px;
-        border-top: 1px dashed #cbd5e1;
-        font-size: 13px;
-        color: #203764;
-        line-height: 1.6;
-    }
-
-    /* Clase que aplica el JS para abrir la información */
-    .prod-card.abierta .card-detalles-ocultos {
-        display: block;
-    }
-
-    /* Contenedor inferior para alinear el boton y el stock */
-    .card-footer-movil {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-top: 8px;
-    }
-
-    /* Stock abajo a la derecha en azul claro igual que el boton mas datos */
-    .card-stock-text {
-        font-size: 13px;
-        font-weight: bold;
-        color: #284B87;
-    }
-
-    /* Alerta en rojo estricto cuando no hay existencias */
-    .card-stock-text.sin-stock {
-        color: #dc2626;
-    }
-
-
-    /* Boton con estilo de flecha compacta sin subrayado */
-    .btn-ver-mas {
-        font-size: 13px;
-        color: #284B87;
-        font-weight: bold;
-        cursor: pointer;
-        background: none;
-        border: none;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        text-decoration: none;
-    }
-}
-
-</style>
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventario | ThermoAir</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #203764;
+            font-family: Calibri, "Segoe UI", Arial, sans-serif;
+            color: #1f2937;
+        }
+
+        header {
+            height: 80px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 35px;
+            color: white;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+        }
+
+        .logo {
+            height: 42px;
+            width: auto;
+        }
+
+        .separador {
+            width: 2px;
+            height: 38px;
+            background: rgba(255, 255, 255, .35);
+            margin-left: 18px;
+            margin-right: 18px;
+        }
+
+        .modulo {
+            color: white;
+            font-size: 30px;
+            font-style: italic;
+            font-weight: normal;
+        }
+
+        header h1 {
+            font-size: 34px;
+            font-style: italic;
+            font-weight: normal;
+        }
+
+        header a {
+            color: white;
+            text-decoration: none;
+            font-size: 18px;
+        }
+
+        header a:hover {
+            text-decoration: underline;
+        }
+
+        main {
+            margin: 0 25px 25px 25px;
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 18px 45px rgba(0, 0, 0, .25);
+        }
+
+        h2 {
+            color: #203764;
+            margin-bottom: 24px;
+            font-size: 34px;
+            font-weight: normal;
+        }
+
+        #txtBuscar {
+            width: 100%;
+            padding: 16px 22px;
+            font-size: 17px;
+            border: 2px solid #d2d9e6;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            outline: none;
+            transition: .20s;
+        }
+
+        #txtBuscar:focus {
+            border-color: #203764;
+            box-shadow: 0 0 0 4px rgba(32, 55, 100, .15);
+        }
+
+        .table-container {
+            border-radius: 10px;
+            overflow: auto;
+            border: 1px solid #d7dde8;
+            max-height: 75vh;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        thead th {
+            background: #284B87;
+            color: white;
+            padding: 14px;
+            position: sticky;
+            top: 0;
+            text-align: left;
+            white-space: nowrap;
+            z-index: 20;
+            font-size: 14px;
+            letter-spacing: .5px;
+        }
+
+        tbody td {
+            padding: 12px 14px;
+            border-bottom: 1px solid #e6ebf2;
+            color: #203764;
+            cursor: pointer;
+        }
+
+        tbody tr:nth-child(even) {
+            background: #fafbfc;
+        }
+
+        tbody tr:hover {
+            background: #dfe9ff;
+            transition: .15s;
+        }
+
+        .col-codigo {
+            font-weight: bold;
+            color: #284B87;
+        }
+
+        .col-subtexto {
+            color: #3b82f6;
+            font-weight: normal;
+            text-transform: uppercase;
+        }
+
+        .col-descripcion {
+            font-weight: bold;
+            color: #1e3a8a;
+        }
+
+        .stock {
+            text-align: center;
+            font-weight: bold;
+            color: #284B87;
+        }
+
+        .stock.sin-stock {
+            color: #dc2626;
+        }
+
+        .precio {
+            text-align: right;
+            font-family: Consolas, monospace;
+            font-weight: bold;
+            color: #203764;
+        }
+
+        .mobile-cards-container {
+            display: none;
+        }
+
+        /* 🚪 MODAL FORMULARIO DE EDICIÓN */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: white;
+            width: 90%;
+            max-width: 600px;
+            border-radius: 14px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            max-height: 90vh;
+        }
+
+        .modal-header {
+            background: #203764;
+            color: white;
+            padding: 18px 24px;
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        .info-estatica {
+            background: #f1f5f9;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #475569;
+            line-height: 1.5;
+            border-left: 4px solid #284B87;
+        }
+
+        .info-estatica strong {
+            color: #203764;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: bold;
+            color: #203764;
+            margin-bottom: 6px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px 14px;
+            font-size: 15px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            outline: none;
+            font-family: inherit;
+            background: white;
+        }
+
+        .form-control:focus {
+            border-color: #284B87;
+            box-shadow: 0 0 0 3px rgba(40, 75, 135, 0.15);
+        }
+
+        .form-control:disabled {
+            background: #f1f5f9;
+            color: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 16px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        .txt-margen {
+            background: #f8fafc;
+            font-weight: bold;
+            color: #16a34a;
+            font-family: Consolas, monospace;
+        }
+
+        .form-hint {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+
+        .form-divider {
+            border: none;
+            border-top: 1px dashed #cbd5e1;
+            margin: 20px 0;
+        }
+
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .checkbox-row input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .checkbox-row label {
+            font-size: 14px;
+            font-weight: bold;
+            color: #203764;
+            cursor: pointer;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            font-size: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            border: none;
+        }
+
+        .btn-secundario {
+            background: #e2e8f0;
+            color: #475569;
+        }
+
+        .btn-primario {
+            background: #284B87;
+            color: white;
+        }
+
+        .btn-primario:hover {
+            background: #203764;
+        }
+
+        .btn-primario:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        /* ➕ FAB - Botón flotante agregar producto */
+        .fab-agregar {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #284B87;
+            color: white;
+            border: none;
+            font-size: 32px;
+            font-weight: normal;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 20px rgba(32, 55, 100, .45);
+            cursor: pointer;
+            z-index: 90;
+            transition: .15s;
+            line-height: 1;
+        }
+
+        .fab-agregar:hover {
+            background: #203764;
+            transform: scale(1.06);
+        }
+
+        /* Resultado de creación: código + descripción copiables */
+        .resultado-creacion {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 10px;
+            padding: 18px;
+            margin-bottom: 4px;
+        }
+
+        .resultado-fila {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            background: white;
+            border: 1px solid #d1fae5;
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin-bottom: 12px;
+        }
+
+        .resultado-fila:last-child {
+            margin-bottom: 0;
+        }
+
+        .resultado-texto {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .resultado-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            color: #16a34a;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        .resultado-valor {
+            font-size: 16px;
+            font-weight: bold;
+            color: #14532d;
+            font-family: Consolas, monospace;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .btn-copiar {
+            flex-shrink: 0;
+            background: #16a34a;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 14px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-copiar:hover {
+            background: #15803d;
+        }
+
+        .btn-copiar.copiado {
+            background: #064e3b;
+        }
+
+        /* 📱 VISTA CELULAR (MENOS DE 768px) */
+        @media (max-width: 768px) {
+            body {
+                background: white;
+            }
+
+            header {
+                background: #203764;
+                height: 65px;
+                padding: 0 15px;
+            }
+
+            .logo { height: 32px; }
+            .separador { height: 26px; margin-left: 10px; margin-right: 10px; }
+            .modulo { font-size: 20px; }
+            header a { font-size: 14px; }
+
+            main {
+                margin: 0;
+                padding: 15px;
+                padding-bottom: 90px;
+                border-radius: 0;
+                box-shadow: none;
+                background: white;
+            }
+
+            h2 {
+                font-size: 24px;
+                margin-bottom: 15px;
+            }
+
+            #txtBuscar {
+                padding: 14px 18px;
+                font-size: 16px;
+                margin-bottom: 15px;
+            }
+
+            .table-container {
+                display: none;
+            }
+
+            .mobile-cards-container {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .prod-card {
+                background: #f8fafc;
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                padding: 14px;
+                display: flex;
+                flex-direction: column;
+                position: relative;
+            }
+
+            .card-descripcion {
+                font-size: 16px;
+                font-weight: bold;
+                color: #1e3a8a;
+                line-height: 1.3;
+                padding-right: 90px;
+                margin-bottom: 4px;
+            }
+
+            .card-codigo-badge {
+                position: absolute;
+                top: 14px;
+                right: 14px;
+                background: #e2e8f0;
+                color: #284B87;
+                padding: 4px 10px;
+                border-radius: 6px;
+                font-size: 13px;
+                font-weight: bold;
+                border: 1px solid #cbd5e1;
+            }
+
+            .card-subtexto {
+                font-size: 12px;
+                color: #3b82f6;
+                margin-bottom: 8px;
+                text-transform: uppercase;
+            }
+
+            .card-precio-venta {
+                font-size: 22px;
+                font-weight: 800;
+                color: #203764;
+            }
+
+            .card-detalles-ocultos {
+                display: none;
+                margin-top: 10px;
+                padding-top: 10px;
+                border-top: 1px dashed #cbd5e1;
+                font-size: 13px;
+                color: #203764;
+                line-height: 1.6;
+            }
+
+            .prod-card.abierta .card-detalles-ocultos {
+                display: block;
+            }
+
+            .card-footer-movil {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-top: 8px;
+            }
+
+            .card-stock-text {
+                font-size: 13px;
+                font-weight: bold;
+                color: #284B87;
+            }
+
+            .card-stock-text.sin-stock {
+                color: #dc2626;
+            }
+
+            .btn-container-movil {
+                display: flex;
+                gap: 12px;
+                align-items: center;
+            }
+
+            .btn-ver-mas {
+                font-size: 13px;
+                color: #284B87;
+                font-weight: bold;
+                cursor: pointer;
+                background: none;
+                border: none;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            }
+
+            .btn-editar-movil {
+                font-size: 13px;
+                color: #16a34a;
+                font-weight: bold;
+                background: none;
+                border: none;
+                cursor: pointer;
+            }
+
+            .fab-agregar {
+                bottom: 20px;
+                right: 20px;
+                width: 56px;
+                height: 56px;
+                font-size: 28px;
+            }
+
+            .modal-content {
+                width: 94%;
+                max-height: 92vh;
+            }
+        }
+    </style>
 </head>
 
 <body>
 
-<header>
+    <header>
+        <div class="logo-area">
+            <img src="Logo/Imagotipo_ThermoAir.svg" alt="ThermoAir" class="logo">
+            <div class="separador"></div>
+            <div class="modulo">Gestión</div>
+        </div>
+        <a href="index_gestion.html">← Menú principal</a>
+    </header>
 
-<div class="logo-area">
+    <main>
+        <h2>Productos</h2>
 
-<img
-src="Logo/Imagotipo_ThermoAir.svg"
-alt="ThermoAir"
-class="logo"
->
+        <input type="text" id="txtBuscar" placeholder="Buscar por código, categoría, subcategoría, descripción, proveedor o código proveedor...">
 
-<div class="separador"></div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>CÓDIGO</th>
+                        <th>CATEGORÍA</th>
+                        <th>SUBCATEGORÍA</th>
+                        <th>DESCRIPCIÓN</th>
+                        <th>STOCK</th>
+                        <th>PROVEEDOR</th>
+                        <th>PRECIO COMPRA</th>
+                        <th>PRECIO VENTA</th>
+                        <th>MARGEN</th>
+                        <th>CODIGO PROV</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaProductos"></tbody>
+            </table>
+        </div>
 
-<div class="modulo">
-Gestión
-</div>
+        <div class="mobile-cards-container" id="contenedorTarjetasMovil"></div>
+    </main>
 
-</div>
+    <!-- ➕ Botón flotante para agregar producto -->
+    <button class="fab-agregar" id="btnAbrirAgregar" title="Agregar producto">+</button>
 
-<a href="index_gestion.html">
-← Menú principal
-</a>
+    <!-- 🚪 MODAL: EDITAR PRODUCTO -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Editar Producto</span>
+                <button class="modal-close" id="btnCerrarModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="info-estatica">
+                    <strong>Código:</strong> <span id="lblCodigo"></span><br>
+                    <strong>Categoría:</strong> <span id="lblCategoria"></span><br>
+                    <strong>Subcategoría:</strong> <span id="lblSubcategoria"></span>
+                </div>
 
-</header>
+                <div class="form-group">
+                    <label for="txtDescripcion">Descripción</label>
+                    <input type="text" id="txtDescripcion" class="form-control">
+                </div>
 
-<main>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="txtProveedor">Proveedor</label>
+                        <input type="text" id="txtProveedor" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="txtCodigoProv">Código Proveedor</label>
+                        <input type="text" id="txtCodigoProv" class="form-control">
+                    </div>
+                </div>
 
-<h2>Productos</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="txtPrecioCompra">Precio Compra</label>
+                        <input type="number" step="0.01" id="txtPrecioCompra" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="txtPrecioVenta">Precio Venta</label>
+                        <input type="number" step="0.01" id="txtPrecioVenta" class="form-control">
+                    </div>
+                </div>
 
-<input
-type="text"
-id="txtBuscar"
-placeholder="Buscar por código, categoría, subcategoría, descripción, proveedor o código proveedor..."
->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="txtStock">Stock Actual</label>
+                        <input type="number" step="0.01" id="txtStock" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Margen Estimado (U.I.)</label>
+                        <input type="text" id="txtMargen" class="form-control txt-margen" readonly>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secundario" id="btnCancelar">Cancelar</button>
+                <button class="btn btn-primario" id="btnGuardar">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
 
-<!-- 🖥️ VISTA PC: Conserva tu tabla exacta con columnas adicionales -->
-<div class="table-container">
+    <!-- ➕ MODAL: AGREGAR PRODUCTO -->
+    <div class="modal-overlay" id="addModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Agregar Producto</span>
+                <button class="modal-close" id="btnCerrarAddModal">&times;</button>
+            </div>
+            <div class="modal-body">
 
-<table>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="addCategoria">Categoría</label>
+                        <input type="text" id="addCategoria" class="form-control" list="listaCategorias" placeholder="Escriba o seleccione...">
+                        <datalist id="listaCategorias"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label for="addSubcategoria">Subcategoría</label>
+                        <input type="text" id="addSubcategoria" class="form-control" list="listaSubcategorias" placeholder="Escriba o seleccione...">
+                        <datalist id="listaSubcategorias"></datalist>
+                    </div>
+                </div>
 
-<thead>
+                <!-- Bloque que solo aplica a ACOPLE / FITTING tipo pesado: medida métrica + tipo de conexión -->
+                <div class="form-row" id="bloqueMedidaConexion" style="display:none;">
+                    <div class="form-group">
+                        <label for="addMedidaMetrica">Medida métrica (M)</label>
+                        <input type="text" id="addMedidaMetrica" class="form-control" placeholder="Ej: 8, 10, 12, 16">
+                    </div>
+                    <div class="form-group">
+                        <label for="addTipoConexion">Tipo de conexión</label>
+                        <select id="addTipoConexion" class="form-control">
+                            <option value="C">Codo 90° (C)</option>
+                            <option value="R">Recto (R)</option>
+                            <option value="S">Codo 45° (S)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-hint" id="hintCodigoEspecial" style="display:none; margin-bottom:16px;"></div>
 
-<tr>
+                <div class="form-group">
+                    <label for="addDescripcion">Descripción</label>
+                    <input type="text" id="addDescripcion" class="form-control" placeholder="Descripción del producto">
+                </div>
 
-<th>CÓDIGO</th>
-<th>CATEGORÍA</th>
-<th>SUBCATEGORÍA</th>
-<th>DESCRIPCIÓN</th>
-<th>STOCK</th>
-<th>PROVEEDOR</th>
-<th>PRECIO COMPRA</th>
-<th>PRECIO VENTA</th>
-<th>MARGEN</th>
-<th>CODIGO PROV</th>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="addProveedor">Proveedor</label>
+                        <input type="text" id="addProveedor" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="addCodigoProv">Código Proveedor</label>
+                        <input type="text" id="addCodigoProv" class="form-control">
+                    </div>
+                </div>
 
-</tr>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="addPrecioCompra">Precio Compra</label>
+                        <input type="number" step="0.01" id="addPrecioCompra" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="addPrecioVenta">Precio Venta</label>
+                        <input type="text" id="addPrecioVenta" class="form-control" placeholder="$ 0">
+                    </div>
+                </div>
 
-</thead>
+                <div class="form-group">
+                    <label for="addStockInicial">Stock Inicial</label>
+                    <input type="number" step="0.01" id="addStockInicial" class="form-control" placeholder="0">
+                </div>
 
-<tbody id="tablaProductos">
-</tbody>
+                <hr class="form-divider">
 
-</table>
+                <div class="checkbox-row">
+                    <input type="checkbox" id="chkAgregarVarios">
+                    <label for="chkAgregarVarios">Agregar varios productos seguidos (mantiene categoría/subcategoría)</label>
+                </div>
 
-</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secundario" id="btnCancelarAdd">Cancelar</button>
+                <button class="btn btn-primario" id="btnGuardarAdd">Crear Producto</button>
+            </div>
+        </div>
+    </div>
 
-<!-- 📱 VISTA MÓVIL: Se activa sola en celulares cubriendo todo el ancho sin bordes azules -->
-<div class="mobile-cards-container" id="contenedorTarjetasMovil"></div>
+    <!-- ✅ MODAL: RESULTADO DE CREACIÓN (código + descripción copiables) -->
+    <div class="modal-overlay" id="resultModal">
+        <div class="modal-content" style="max-width: 460px;">
+            <div class="modal-header">
+                <span>Producto creado</span>
+                <button class="modal-close" id="btnCerrarResultModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="resultado-creacion">
+                    <div class="resultado-fila">
+                        <div class="resultado-texto">
+                            <span class="resultado-label">Código</span>
+                            <span class="resultado-valor" id="resCodigo">—</span>
+                        </div>
+                        <button class="btn-copiar" id="btnCopiarCodigo" data-target="resCodigo">Copiar</button>
+                    </div>
+                    <div class="resultado-fila">
+                        <div class="resultado-texto">
+                            <span class="resultado-label">Descripción</span>
+                            <span class="resultado-valor" id="resDescripcion">—</span>
+                        </div>
+                        <button class="btn-copiar" id="btnCopiarDescripcion" data-target="resDescripcion">Copiar</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secundario" id="btnCerrarResultado">Cerrar</button>
+                <button class="btn btn-primario" id="btnAgregarOtro">Agregar otro</button>
+            </div>
+        </div>
+    </div>
 
-</main>
-
-<script src="productos.js"></script>
+    <script src="productos.js"></script>
 
 </body>
-
 </html>

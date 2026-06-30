@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Salidas | ThermoAir</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    background: #203764;
+    font-family: Calibri, "Segoe UI", Arial, sans-serif;
+    color: #1f2937;
+}
+
+/* ── HEADER ── */
+header {
+    height: 80px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 35px;
+    color: white;
+}
+.logo-area { display: flex; align-items: center; }
+.logo { height: 42px; width: auto; }
+.separador { width: 2px; height: 38px; background: rgba(255,255,255,.35); margin: 0 18px; }
+.modulo { color: white; font-size: 30px; font-style: italic; font-weight: normal; }
+header a { color: white; text-decoration: none; font-size: 18px; }
+header a:hover { text-decoration: underline; }
+
+/* ── MAIN ── */
+main {
+    margin: 0 25px 25px 25px;
+    background: white;
+    border-radius: 16px;
+    padding: 30px;
+    box-shadow: 0 18px 45px rgba(0,0,0,.25);
+    min-height: calc(100vh - 105px);
+}
+
+h2 { color: #203764; margin-bottom: 24px; font-size: 34px; font-weight: normal; }
+
+/* ── BUSCADOR PRINCIPAL DE LA TABLA ── */
+#txtBuscar {
+    width: 100%;
+    padding: 16px 22px;
+    font-size: 17px;
+    border: 2px solid #d2d9e6;
+    border-radius: 10px;
+    margin-bottom: 25px;
+    outline: none;
+    transition: .20s;
+}
+#txtBuscar:focus { border-color: #203764; box-shadow: 0 0 0 4px rgba(32,55,100,.15); }
+
+/* ── TABLA PC ── */
+.table-container {
+    border-radius: 10px;
+    overflow: auto;
+    border: 1px solid #d7dde8;
+    max-height: 72vh;
+}
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+thead th {
+    background: #284B87;
+    color: white;
+    padding: 12px 14px;
+    position: sticky;
+    top: 0;
+    text-align: left;
+    white-space: nowrap;
+    z-index: 20;
+}
+tbody td { padding: 11px 14px; border-bottom: 1px solid #e6ebf2; color: #203764; }
+tbody tr:nth-child(even) { background: #fafbfc; }
+tbody tr:hover { background: #dfe9ff; cursor: pointer; }
+
+.mobile-cards-container { display: none; }
+
+/* ── FAB ── */
+#btnNuevaSalida {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    width: 60px;
+    height: 60px;
+    background: #284B87;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    font-size: 30px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0,0,0,.35);
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── SHEET OVERLAY FORMULARIO NUEVA SALIDA ── */
+#overlaySheet {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.5);
+    z-index: 1000;
+}
+#overlaySheet.visible { display: block; }
+
+#hojaSheet {
+    position: fixed;
+    bottom: -100%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 550px;
+    background: white;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -5px 25px rgba(0,0,0,.2);
+    z-index: 1001;
+    transition: bottom .3s ease-out;
+    max-height: 95vh;
+    display: flex;
+    flex-direction: column;
+}
+#hojaSheet.visible { bottom: 0; }
+
+.sheet-handle {
+    width: 50px;
+    height: 5px;
+    background: #cbd5e1;
+    border-radius: 3px;
+    margin: 12px auto 6px auto;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.sheet-titulo {
+    color: #203764;
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+    padding: 10px 20px;
+    border-bottom: 1px solid #f1f5f9;
+    flex-shrink: 0;
+}
+
+.sheet-body { 
+    padding: 16px 20px; 
+    overflow-y: auto; 
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Toggle Bus / Cliente */
+.toggle-tipo {
+    display: flex;
+    background: #f1f5f9;
+    border-radius: 10px;
+    padding: 4px;
+    gap: 4px;
+}
+.toggle-tipo button {
+    flex: 1;
+    padding: 10px 0;
+    border: none;
+    border-radius: 7px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    background: transparent;
+    color: #64748b;
+}
+.toggle-tipo button.activo {
+    background: #284B87;
+    color: white;
+}
+
+/* Campos del form */
+.campo { display: flex; flex-direction: column; }
+.campo label {
+    font-size: 11px;
+    font-weight: bold;
+    color: #203764;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+}
+.campo input, .campo select {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 8px;
+    outline: none;
+    font-size: 15px;
+    font-family: inherit;
+    background: white;
+}
+.campo input:focus, .campo select:focus { border-color: #284B87; }
+
+/* ── CAJA CONTENEDORA GRIS DEL BUSCADOR ── */
+.buscador-productos-box {
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    position: relative; /* REPARACIÓN: Base para el posicionamiento del dropdown */
+}
+
+/* ── SOLUCIÓN DE ALINEACIÓN: DESPLEGABLE DINÁMICO REPARADO ── */
+#dropdownProductos {
+    display: none; /* Tu JS lo maneja cambiando a display: block/none */
+    background: white;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 8px;
+    max-height: 180px;
+    overflow-y: auto;
+    
+    /* Reglas fijas que respetan el ancho del formulario tanto en PC como en Móvil */
+    position: absolute;
+    top: 72px; /* Ajusta este valor si tu input cambia de altura; coloca el menú justo debajo del input */
+    left: 12px; /* Alineado con el padding interno de la caja contenedora */
+    right: 12px; /* Se extiende horizontalmente hasta el borde interno */
+    z-index: 1100; /* Asegura que flote por encima de la cantidad y el botón */
+    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+}
+
+.dropdown-item {
+    padding: 11px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 14px;
+    color: #1f2937;
+}
+.dropdown-item:hover { background: #dfe9ff; color: #203764; }
+
+/* Mini tabla de items agregados */
+.mini-tabla-wrap {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow-y: auto;
+    max-height: 150px;
+    background: white;
+}
+.mini-tabla-wrap table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.mini-tabla-wrap thead th {
+    background: #475569;
+    color: white;
+    padding: 8px 10px;
+    text-align: left;
+    position: sticky;
+    top: 0;
+}
+.mini-tabla-wrap tbody td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; }
+
+.btn-agregar-item {
+    width: 100%;
+    padding: 12px;
+    background: #284B87;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 14px;
+    cursor: pointer;
+}
+.btn-agregar-item:hover { background: #203764; }
+
+.btn-confirmar {
+    width: 100%;
+    padding: 14px;
+    background: #10b981;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: auto;
+}
+
+/* ── MENU CONTEXTUAL ── */
+#menuContextual {
+    display: none;
+    position: fixed;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.18);
+    z-index: 2000;
+    overflow: hidden;
+    min-width: 180px;
+    border: 1px solid #e2e8f0;
+}
+#menuContextual.visible { display: block; }
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 18px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #203764;
+}
+.menu-item:hover { background: #f1f5f9; }
+.menu-item.danger { color: #dc2626; }
+.menu-item.danger:hover { background: #fef2f2; }
+.menu-sep { height: 1px; background: #f1f5f9; margin: 0; }
+
+/* ── TOAST ── */
+#toast {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #1e293b;
+    color: white;
+    padding: 12px 22px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: bold;
+    opacity: 0;
+    transition: opacity .25s, transform .25s;
+    z-index: 3000;
+    pointer-events: none;
+    white-space: nowrap;
+}
+#toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ════════════════════════════════════
+    📱 VISTA MÓVIL
+   ════════════════════════════════════ */
+@media (max-width: 768px) {
+    body { background: white; }
+    main { margin: 0; padding: 15px; border-radius: 0; box-shadow: none; }
+    .table-container { display: none; }
+    .mobile-cards-container { display: flex; flex-direction: column; }
+    
+    #hojaSheet { 
+        max-width: 100%; 
+        height: 100vh; 
+        max-height: 100vh; 
+        border-radius: 0; 
+    }
+}
+</style>
+</head>
+<body>
+
+<header>
+    <div class="logo-area">
+        <img src="Logo/Imagotipo_ThermoAir.svg" alt="ThermoAir" class="logo">
+        <div class="separador"></div>
+        <div class="modulo">Gestión</div>
+    </div>
+    <a href="index_gestion.html">← Menú principal</a>
+</header>
+
+<main>
+    <h2>Salidas de Bodega</h2>
+    <input type="text" id="txtBuscar" placeholder="Buscar registros anteriores...">
+
+    <div class="table-container" id="vistaPC">
+        <table>
+            <thead>
+                <tr>
+                    <th>CÓDIGO</th>
+                    <th>DESCRIPCIÓN</th>
+                    <th>CANT.</th>
+                    <th>HORA</th>
+                    <th>RECIBE / CLIENTE</th>
+                    <th>TIPO</th>
+                    <th>BUS</th>
+                </tr>
+            </thead>
+            <tbody id="tablaBody"></tbody>
+        </table>
+    </div>
+
+    <div class="mobile-cards-container" id="vistaMobile"></div>
+</main>
+
+<button id="btnNuevaSalida" title="Nueva salida">+</button>
+
+<div id="overlaySheet"></div>
+<div id="hojaSheet">
+    <div class="sheet-handle" id="sheetHandle"></div>
+    <div class="sheet-titulo" id="sheetTitulo">Nueva Salida</div>
+    
+    <div class="sheet-body">
+        <div class="toggle-tipo">
+            <button id="btnModoVenta" class="activo" onclick="setModo('V')">🧾 Venta / Cliente</button>
+            <button id="btnModoBus" onclick="setModo('T')">🚌 Bus en servicio</button>
+        </div>
+
+        <div class="campo" id="campoBus" style="display:none;">
+            <label>Bus</label>
+            <select id="selBus">
+                <option value="">— Seleccionar bus —</option>
+            </select>
+        </div>
+
+        <div class="campo">
+            <label id="labelRecibe">Cliente</label>
+            <input type="text" id="inputRecibe" placeholder="Nombre de quien recibe">
+        </div>
+
+        <hr style="border:none;border-top:1px solid #f1f5f9;margin-bottom:4px;">
+
+        <div class="buscador-productos-box">
+            <div class="campo">
+                <label>Producto</label>
+                <input type="text" id="inputProducto" placeholder="Buscar código o descripción..." autocomplete="off">
+            </div>
+            
+            <div id="dropdownProductos"></div>
+
+            <div class="campo">
+                <label>Cantidad</label>
+                <input type="number" id="inputCantidad" value="1" min="0.01" step="0.01" style="text-align:center;">
+            </div>
+
+            <button class="btn-agregar-item" onclick="agregarItemPendiente()">＋ Agregar Producto</button>
+        </div>
+
+        <div class="mini-tabla-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>CÓDIGO</th>
+                        <th>DESCRIPCIÓN</th>
+                        <th>CANT.</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="miniTablaBody">
+                    <tr><td colspan="4" class="mini-tabla-vacia" style="text-align:center; color:#94a3b8; padding:15px;">Aún no hay items. Agrega productos arriba.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <button class="btn-confirmar" id="btnConfirmar" onclick="confirmarSalidas()">Confirmar y guardar</button>
+    </div>
+</div>
+
+<div id="menuContextual">
+    <div class="menu-item" onclick="editarSalidaDesdeMenu()">✏️ Editar</div>
+    <div class="menu-sep"></div>
+    <div class="menu-item danger" onclick="eliminarSalidaDesdeMenu()">🗑️ Eliminar</div>
+</div>
+
+<div id="toast"></div>
+
+<script src="salidas.js"></script>
+</body>
+</html>
