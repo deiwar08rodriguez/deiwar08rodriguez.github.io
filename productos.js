@@ -140,7 +140,6 @@ function renderizarProductos(datos) {
     if (contenedorMovil) contenedorMovil.innerHTML = htmlMovil;
 }
 
-// ===================== MODAL EDITAR =====================
 
 function abrirModalEditar(codigo) {
     const producto = productos.find(p => p.codigo === codigo);
@@ -212,37 +211,35 @@ document.getElementById("btnGuardar").addEventListener("click", async function (
             updateData.fecha_precio = fechaActual;
         }
 
-// 1. Intentar actualizar el producto en Supabase (Verificando cambios reales)
         const { data: registroModificado, error: errProd } = await supabaseClient
             .from("productos")
             .update(updateData)
             .eq("codigo", mCodigoActual)
-            .select(); // Esto obliga a Supabase a devolver el renglón editado
+            .select();
 
         if (errProd) throw new Error(`Error en tabla 'productos': ${errProd.message}`);
-// =========================================================
-        // 🛰️ CONEXIÓN AUTOMÁTICA CON LA API DE SIIGO (CON DETECTOR DE ERRORES)
-        // =========================================================
+
         const productoEditado = registroModificado[0];
 
-        if (productoEditado.siigo_id) {
+        if (productoEditado.codigo) {
             btnGuardar.innerText = "Sincronizando con Siigo...";
+            btnGuardar.disabled = true; 
+
             try {
                 const respuestaSiigo = await fetch('https://vdlxmajvzdtbewchyowm.supabase.co/functions/v1/smart-endpoint', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        siigo_id: productoEditado.siigo_id,
-                        code: productoEditado.codigo,
-                        name: descripcion, 
-                        price: precioVenta 
+                        siigo_id: productoEditado.siigo_id || "", 
+                        code: productoEditado.codigo,     
+                        name: descripcion,                     
+                        price: precioVenta                    
                     })
                 });
 
-                // Si la función de Supabase responde un error de servidor (400, 500, etc.)
                 if (!respuestaSiigo.ok) {
-                    const textoError = await respuestaSiigo.text(); // Leemos el error crudo
-                    throw new Error(`Servidor Supabase respondió: ${respuestaSiigo.status} - ${textoError}`);
+                    const textoError = await respuestaSiigo.text();
+                    throw new Error(`Servidor Supabase: ${respuestaSiigo.status} - ${textoError}`);
                 }
 
                 const resultadoSiigo = await respuestaSiigo.json();
@@ -251,12 +248,12 @@ document.getElementById("btnGuardar").addEventListener("click", async function (
                     throw new Error(resultadoSiigo.error || "Error interno sin mensaje.");
                 }
 
-                alert("✅ ¡Éxito! Guardado en Supabase y actualizado en Siigo.");
 
             } catch (errorSiigo) {
-                // ESTA ALERTA AHORA SÍ TE VA A DECIR EL MOTIVO REAL
-                console.error("Detalle del error de Siigo:", errorSiigo);
-                alert("⚠️ Guardado en Supabase, pero falló Siigo.\n\nMOTIVO REAL DEL FALLO:\n" + errorSiigo.message);
+                console.error("Error de Siigo:", errorSiigo);
+            } finally {
+                btnGuardar.innerText = "Guardar Cambios";
+                btnGuardar.disabled = false;
             }
         }
 
@@ -312,11 +309,9 @@ document.getElementById("btnGuardar").addEventListener("click", async function (
 
         cerrarModal();
         await cargarProductos();
-        alert("Producto guardado exitosamente.");
 
     } catch (error) {
         console.error("Error al procesar el guardado:", error);
-        alert(error.message || "Error desconocido al guardar los cambios.");
     } finally {
         btnGuardar.disabled = false;
         btnGuardar.innerText = "Guardar Cambios";
