@@ -181,38 +181,43 @@
             display: none;
         }
 
-        /* 🚪 MODAL FORMULARIO DE EDICIÓN */
         .modal-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            background: rgba(0, 0, 0, 0.6);
             z-index: 100;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.2s ease;
+            transition: opacity 0.3s ease;
         }
 
-        .modal-overlay.active {
+        .modal-overlay.visible {
             opacity: 1;
             pointer-events: auto;
         }
 
         .modal-content {
             background: white;
-            width: 90%;
-            max-width: 600px;
-            border-radius: 14px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 650px;
+            border-radius: 20px 20px 0 0;
+            box-shadow: 0 -10px 35px rgba(0, 0, 0, 0.3);
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            max-height: 90vh;
+            max-height: 85vh;
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translate(-50%, 100%);
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        .modal-overlay.visible .modal-content {
+            transform: translate(-50%, 0);
         }
 
         .modal-header {
@@ -282,17 +287,41 @@
             box-shadow: 0 0 0 3px rgba(40, 75, 135, 0.15);
         }
 
-        .form-control:disabled {
+.form-control:disabled {
             background: #f1f5f9;
             color: #94a3b8;
             cursor: not-allowed;
         }
 
+/* ── DROPDOWN PREDICTIVOS ── */
+        .dropdown-predictivo {
+            display: none;
+            background: white;
+            border: 1.5px solid #284B87;
+            border-radius: 8px;
+            max-height: 180px;
+            overflow-y: auto;
+            position: absolute;
+            top: 72px;
+            left: 0;
+            right: 0;
+            z-index: 1200;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+        }
+
+        .dropdown-item {
+            padding: 11px 14px;
+            cursor: pointer;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 14px;
+            color: #1f2937;
+        }
+        .dropdown-item:hover { background: #dfe9ff; color: #203764; }
+        
         .form-row {
             display: flex;
             gap: 16px;
         }
-
         .form-row .form-group {
             flex: 1;
         }
@@ -629,9 +658,10 @@
                 font-size: 28px;
             }
 
-            .modal-content {
-                width: 94%;
-                max-height: 92vh;
+.modal-content {
+                width: 100%;
+                max-height: 90vh;
+                border-radius: 16px 16px 0 0;
             }
         }
     </style>
@@ -726,7 +756,7 @@
                         <input type="number" step="0.01" id="txtStock" class="form-control">
                     </div>
                     <div class="form-group">
-                        <label>Margen Estimado (U.I.)</label>
+                        <label>Margen Estimado</label>
                         <input type="text" id="txtMargen" class="form-control txt-margen" readonly>
                     </div>
                 </div>
@@ -747,16 +777,16 @@
             </div>
             <div class="modal-body">
 
-                <div class="form-row">
+<div class="form-row">
                     <div class="form-group">
                         <label for="addCategoria">Categoría</label>
-                        <input type="text" id="addCategoria" class="form-control" list="listaCategorias" placeholder="Escriba o seleccione...">
-                        <datalist id="listaCategorias"></datalist>
+                        <input type="text" id="addCategoria" class="form-control" placeholder="Buscar o escribir categoría..." autocomplete="off">
+                        <div id="dropdownCategoria" class="dropdown-predictivo"></div>
                     </div>
                     <div class="form-group">
                         <label for="addSubcategoria">Subcategoría</label>
-                        <input type="text" id="addSubcategoria" class="form-control" list="listaSubcategorias" placeholder="Escriba o seleccione...">
-                        <datalist id="listaSubcategorias"></datalist>
+                        <input type="text" id="addSubcategoria" class="form-control" placeholder="Buscar o escribir subcategoría..." autocomplete="off" disabled>
+                        <div id="dropdownSubcategoria" class="dropdown-predictivo"></div>
                     </div>
                 </div>
 

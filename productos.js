@@ -372,11 +372,7 @@ document.getElementById("txtBuscar").addEventListener("input", function () {
         renderizarProductos(filtrados);
     }, 150);
 });
-
-// =====================================================================
 // ===================== MÓDULO: AGREGAR PRODUCTO ======================
-// =====================================================================
-
 const TAMANOS_PULGADA = [
     { label: "5/16", codigo: "01" },
     { label: "13/32", codigo: "02" },
@@ -399,11 +395,11 @@ let mAddSubcategoriaSeleccionada = "";
 async function cargarCatalogos() {
     const { data: cats, error: errCat } = await supabaseClient
         .from("categorias")
-        .select("CATEGORIA, CODIGO");
+        .select("categoria, codigo");
 
     const { data: subs, error: errSub } = await supabaseClient
         .from("subcategorias")
-        .select("CATEGORIAS, SUBCATEGORIAS, CODIGO");
+        .select("categorias, subcategoria, codigo");
 
     if (errCat) console.error("Error cargando categorías:", errCat);
     if (errSub) console.error("Error cargando subcategorías:", errSub);
@@ -411,82 +407,117 @@ async function cargarCatalogos() {
     categoriasCache = cats || [];
     subcategoriasCache = subs || [];
 
-    // Cargar datalist de categorías original
-    const listaCategorias = document.getElementById("listaCategorias");
-    if (listaCategorias) {
-        listaCategorias.innerHTML = "";
-        const categoriasUnicas = [...new Set(categoriasCache.map(c => c.CATEGORIA))];
-        categoriasUnicas.forEach(c => {
-            const opt = document.createElement("option");
-            opt.value = c;
-            listaCategorias.appendChild(opt);
-        });
+    // Categorías
+    const inputCat = document.getElementById("addCategoria");
+    if (inputCat) {
+        const categoriasUnicas = [...new Set(categoriasCache.map(c => c.categoria))];
+        inputCat.addEventListener("input", (e) => buscarCategoriasPredictivo(e.target.value, categoriasUnicas));
     }
 
-    // Forzar que el input de subcategoría empiece bloqueado y vacío
+    // Subcategorías - inicialmente deshabilitada
     const inputSub = document.getElementById("addSubcategoria");
     if (inputSub) {
         inputSub.disabled = true;
         inputSub.value = "";
     }
-    const listaSubcategorias = document.getElementById("listaSubcategorias");
-    if (listaSubcategorias) listaSubcategorias.innerHTML = "";
 }
 
-function actualizarSubcategoriasDatalist(categoria) {
-    const listaSub = document.getElementById("listaSubcategorias");
-    const inputSub = document.getElementById("addSubcategoria");
-    if (listaSub) listaSub.innerHTML = "";
+function buscarCategoriasPredictivo(busqueda, categoriasUnicas) {
+    const divDropdown = document.getElementById('dropdownCategoria');
+    if (!divDropdown) return;
 
-    const categoriaNorm = normalizarBusqueda(categoria);
-    
-    // Validar si la categoría escrita pertenece al caché válido
-    const categoriaValida = categoriasCache.some(c => normalizarBusqueda(c.CATEGORIA) === categoriaNorm);
-
-    if (!categoria || !categoriaValida) {
-        if (inputSub) {
-            inputSub.disabled = true;
-            inputSub.value = ""; 
-        }
-        actualizarBloqueEspecial();
+    if (busqueda.length < 1) {
+        divDropdown.style.display = 'none';
         return;
     }
 
-    // Filtrar subcategorías correspondientes
-    const subsFiltradas = subcategoriasCache
-        .filter(s => normalizarBusqueda(s.CATEGORIAS) === categoriaNorm)
-        .map(s => s.SUBCATEGORIAS);
+    const filtradas = categoriasUnicas.filter(c => normalizarBusqueda(c).includes(normalizarBusqueda(busqueda)));
 
-    const subcategoriasUnicas = [...new Set(subsFiltradas)];
+    divDropdown.innerHTML = '';
+    if (filtradas.length === 0) {
+        divDropdown.style.display = 'none';
+        return;
+    }
 
-    if (listaSub) {
-        subcategoriasUnicas.forEach(s => {
-            const opt = document.createElement("option");
-            opt.value = s;
-            listaSub.appendChild(opt);
+    divDropdown.style.display = 'block';
+
+    filtradas.forEach(categoria => {
+        const item = document.createElement('div');
+        item.className = 'dropdown-item';
+        item.textContent = categoria;
+        item.addEventListener('click', () => {
+            document.getElementById('addCategoria').value = categoria;
+            divDropdown.style.display = 'none';
+            actualizarSubcategoriasPredictivo(categoria);
+            actualizarBloqueEspecial();
         });
-    }
+        divDropdown.appendChild(item);
+    });
+}
 
-    // Si tiene subcategorías, habilitamos el input original
-    if (inputSub) {
-        inputSub.disabled = false;
-    }
+function actualizarSubcategoriasPredictivo(categoria) {
+    const inputSub = document.getElementById("addSubcategoria");
+    if (!inputSub) return;
+
+    const categoriaNorm = normalizarBusqueda(categoria);
+    const subcategoriasValidas = subcategoriasCache
+        .filter(s => normalizarBusqueda(s.categorias) === categoriaNorm)
+        .map(s => s.subcategoria);
+    
+    subcategoriasValidas.push(categoria);
+    const subcategoriasUnicas = [...new Set(subcategoriasValidas)].filter(s => s && s.trim() !== "");
+
+    inputSub.disabled = false;
+    inputSub.value = "";
+
+    inputSub.addEventListener("input", (e) => {
+        const divDropdown = document.getElementById('dropdownSubcategoria');
+        if (!divDropdown) return;
+
+        const busqueda = e.target.value;
+        if (busqueda.length < 1) {
+            divDropdown.style.display = 'none';
+            return;
+        }
+
+        const filtradas = subcategoriasUnicas.filter(s => normalizarBusqueda(s).includes(normalizarBusqueda(busqueda)));
+
+        divDropdown.innerHTML = '';
+        if (filtradas.length === 0) {
+            divDropdown.style.display = 'none';
+            return;
+        }
+
+        divDropdown.style.display = 'block';
+
+        filtradas.forEach(subcategoria => {
+            const item = document.createElement('div');
+            item.className = 'dropdown-item';
+            item.textContent = subcategoria;
+            item.addEventListener('click', () => {
+                document.getElementById('addSubcategoria').value = subcategoria;
+                divDropdown.style.display = 'none';
+                actualizarBloqueEspecial();
+            });
+            divDropdown.appendChild(item);
+        });
+    }, { once: false });
 }
 
 function obtenerCodigoCategoria(categoria) {
     const categoriaNorm = normalizarBusqueda(categoria);
-    const fila = categoriasCache.find(c => normalizarBusqueda(c.CATEGORIA) === categoriaNorm);
-    return fila ? String(fila.CODIGO).trim() : "";
+    const fila = categoriasCache.find(c => normalizarBusqueda(c.categoria) === categoriaNorm);
+    return fila ? String(fila.codigo).trim() : "";
 }
 
 function obtenerCodigoSubcategoria(categoria, subcategoria) {
     const categoriaNorm = normalizarBusqueda(categoria);
     const subNorm = normalizarBusqueda(subcategoria);
-    const fila = subcategoriasCache.find(s =>
-        normalizarBusqueda(s.CATEGORIAS) === categoriaNorm &&
-        normalizarBusqueda(s.SUBCATEGORIAS) === subNorm
+const fila = subcategoriasCache.find(s =>
+        normalizarBusqueda(s.categorias) === categoriaNorm &&
+        normalizarBusqueda(s.subcategoria) === subNorm
     );
-    return fila ? String(fila.CODIGO).trim() : "";
+    return fila ? String(fila.codigo).trim() : "";
 }
 
 function asegurarSelectorTamano() {
@@ -559,12 +590,6 @@ function actualizarBloqueEspecial() {
     previsualizarCodigo();
 }
 
-// Escucha el input de categorías en tiempo real
-document.getElementById("addCategoria").addEventListener("input", function () {
-    actualizarSubcategoriasDatalist(this.value);
-    actualizarBloqueEspecial();
-});
-document.getElementById("addSubcategoria").addEventListener("input", actualizarBloqueEspecial);
 document.getElementById("addMedidaMetrica").addEventListener("input", previsualizarCodigo);
 document.getElementById("addTipoConexion").addEventListener("change", previsualizarCodigo);
 
@@ -658,11 +683,17 @@ async function codigoYaExiste(codigo) {
 
 function limpiarFormularioAgregar(parcial) {
     if (!parcial) {
-        document.getElementById("addCategoria").value = "";
-        const inputSub = document.getElementById("addSubcategoria");
+        const inputCat = document.getElementById("addCategoria");
+        if (inputCat) {
+            inputCat.value = "";
+            inputCat.disabled = false;
+        }
+const inputSub = document.getElementById("addSubcategoria");
         if (inputSub) {
             inputSub.value = "";
             inputSub.disabled = true;
+            const menuSub = inputSub.parentElement.querySelector(".custom-dropdown-menu");
+            if (menuSub) menuSub.style.display = "none";
         }
         const listaSubcategorias = document.getElementById("listaSubcategorias");
         if (listaSubcategorias) listaSubcategorias.innerHTML = "";
@@ -679,12 +710,12 @@ function limpiarFormularioAgregar(parcial) {
 function abrirModalAgregar() {
     cargarCatalogos();
     limpiarFormularioAgregar(false);
-    document.getElementById("addModal").classList.add("active");
+    document.getElementById("addModal").classList.add("visible");
     document.getElementById("addCategoria").focus();
 }
 
 function cerrarModalAgregar() {
-    document.getElementById("addModal").classList.remove("active");
+    document.getElementById("addModal").classList.remove("visible");
 }
 
 function limpiarPrecioTexto(valor) {
@@ -747,7 +778,49 @@ document.getElementById("btnGuardarAdd").addEventListener("click", async functio
                 fecha_precio: precioCompra > 0 ? fechaActual : null
             }]);
 
-        if (error) throw new Error(`Error insertando producto nuevo: ${error.message}`);
+if (error) throw new Error(`Error insertando producto nuevo: ${error.message}`);
+
+        // ==========================================
+        // NUEVO: SINCRONIZACIÓN Y RECICLAJE EN SIIGO
+        // ==========================================
+        btnGuardar.innerText = "Sincronizando con Siigo...";
+        
+        try {
+            const respuestaSiigo = await fetch('https://vdlxmajvzdtbewchyowm.supabase.co/functions/v1/smart-endpoint', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'create', // Busca un inactivo en Siigo y lo recicla
+                    code: codigo,     
+                    name: descripcion,                      
+                    price: precioVenta                    
+                })
+            });
+
+            if (!respuestaSiigo.ok) {
+                const textoError = await respuestaSiigo.text();
+                throw new Error(`Servidor Supabase (Edge): ${respuestaSiigo.status} - ${textoError}`);
+            }
+
+            const resultadoSiigo = await respuestaSiigo.json();
+
+            if (!resultadoSiigo.success) {
+                throw new Error(resultadoSiigo.error || "Error interno de Siigo sin mensaje.");
+            }
+
+            // Si el reciclaje fue exitoso, guardamos ese siigo_id en Supabase para amarrarlos
+            if (resultadoSiigo.siigo_id) {
+                await supabaseClient
+                    .from("productos")
+                    .update({ siigo_id: resultadoSiigo.siigo_id })
+                    .eq("codigo", codigo);
+            }
+
+        } catch (errorSiigo) {
+            console.error("Error de Siigo en adición:", errorSiigo);
+            alert("¡Atención!: El producto se guardó en Supabase localmente, pero falló el reciclaje/activación en Siigo: " + errorSiigo.message);
+        }
+        // ==========================================
 
         await cargarProductos();
 
@@ -811,5 +884,12 @@ document.getElementById("btnAgregarOtro").addEventListener("click", function () 
     abrirModalAgregar();
 });
 
-// Inicialización de la App
+document.addEventListener('click', e => {
+    const divCat = document.getElementById('dropdownCategoria');
+    const divSub = document.getElementById('dropdownSubcategoria');
+    
+    if (e.target.id !== 'addCategoria' && divCat) divCat.style.display = 'none';
+    if (e.target.id !== 'addSubcategoria' && divSub) divSub.style.display = 'none';
+});
+
 cargarProductos();
