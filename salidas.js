@@ -1,13 +1,14 @@
 // ══════════════════════════════════════════════════════════
-//  CONFIGURACIÓN SUPABASE  ← cambia estas dos líneas
+//  CONFIGURACIÓN SUPABASE ← ACTUALIZA AQUÍ CON TUS CREDENCIALES
 // ══════════════════════════════════════════════════════════
 const SUPABASE_URL  = 'https://vdlxmajvzdtbewchyowm.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkbHhtYWp2emR0YmV3Y2h5b3dtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyMTQwNzAsImV4cCI6MjA5Nzc5MDA3MH0.Lkd6dAfeItdxPS-rEiruHDB36-1GDE6I_0ogR7TuhFM';
+
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 // ── Estado global ──
 let todasSalidas  = [];   // raw de supabase
-let todosProductos = [];  // { id, codigo, descripcion, stock }
+let todosProductos = [];  // { row_id, codigo, descripcion, stock }
 let todosBuses     = [];  // { id, bus, placa }
 let modoActual     = 'V'; // 'V' venta, 'T' bus
 let itemsPendientes = []; // items acumulados en el sheet antes de confirmar
@@ -37,13 +38,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ══════════════════════════════════════════════════════════
 async function cargarProductos() {
     const { data, error } = await sb.from('productos').select('row_id, codigo, descripcion, stock');
-    if (error) { console.error('productos:', error); return; }
+    if (error) { 
+        console.error('Error cargando productos:', error); 
+        mostrarToast('Error al cargar productos', 'err');
+        return; 
+    }
     todosProductos = data || [];
 }
 
 async function cargarBuses() {
     const { data, error } = await sb.from('buses').select('id, bus, placa').order('placa');
-    if (error) { console.error('buses:', error); return; }
+    if (error) { 
+        console.error('Error cargando buses:', error); 
+        mostrarToast('Error al cargar buses', 'err');
+        return; 
+    }
     todosBuses = data || [];
 
     // Poblar select del sheet
@@ -64,7 +73,11 @@ async function cargarSalidas() {
         .order('fecha', { ascending: false })
         .order('hora', { ascending: false });
 
-    if (error) { console.error('salidas:', error); return; }
+    if (error) { 
+        console.error('Error cargando salidas:', error); 
+        mostrarToast('Error al cargar salidas', 'err');
+        return; 
+    }
     todasSalidas = data || [];
 }
 
@@ -196,44 +209,36 @@ function renderMobile(grupos) {
     cont.innerHTML = '';
 
     if (grupos.size === 0) {
-        cont.innerHTML = `<div class="estado-vacio"><div class="estado-vacio-icono">📭</div>Sin salidas registradas</div>`;
+        cont.innerHTML = `<div style="text-align:center;padding:60px 20px;color:#94a3b8;">Sin salidas registradas</div>`;
         return;
     }
 
     grupos.forEach((filas, fechaKey) => {
         const grupo = document.createElement('div');
-        grupo.className = 'grupo-fecha';
+        grupo.style.marginBottom = '20px';
 
         const header = document.createElement('div');
-        header.className = 'grupo-fecha-header';
-        header.innerHTML = `
-            <span class="grupo-fecha-label">${etiquetaFecha(fechaKey)} (${filas.length})</span>
-            <div class="grupo-fecha-linea"></div>
-            <span class="grupo-fecha-chevron">▾</span>`;
-        header.addEventListener('click', () => {
-            grupo.classList.toggle('colapsado');
-        });
+        header.style.cssText = 'font-size:12px;font-weight:bold;color:#284B87;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;';
+        header.textContent = `${etiquetaFecha(fechaKey)} — ${filas.length} salida${filas.length!==1?'s':''}`;
 
-        const filasDiv = document.createElement('div');
-        filasDiv.className = 'grupo-filas';
+        grupo.appendChild(header);
 
         filas.forEach(s => {
             const card = document.createElement('div');
-            card.className = 'salida-card';
+            card.style.cssText = 'background:white;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:10px;cursor:pointer;';
             card.dataset.id = s.id;
 
             const esT = s.tipo === 'T';
             card.innerHTML = `
-                <div class="salida-card-icono ${esT ? 'icono-T' : 'icono-V'}">${esT ? '🚌' : '🧾'}</div>
-                <div class="salida-card-body">
-                    <div class="salida-card-top">
-                        <span class="salida-card-desc">${descripcionDeCodigo(s.codigo)}</span>
-                        <span class="salida-card-cant">${formatCant(s.cantidad)} u.</span>
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+                    <div style="flex:1;">
+                        <div style="font-weight:bold;color:#203764;margin-bottom:4px;">${descripcionDeCodigo(s.codigo)}</div>
+                        <div style="font-size:12px;color:#64748b;margin-bottom:6px;">${s.codigo || ''}</div>
+                        <div style="font-size:12px;color:#64748b;">${s.recibe || '—'} ${s.hora ? '· ' + s.hora : ''}</div>
                     </div>
-                    <div class="salida-card-sub">${s.codigo || ''} ${nombreBus(s.bus) ? '· ' + nombreBus(s.bus) : ''}</div>
-                    <div class="salida-card-footer">
-                        <span class="salida-card-recibe">${s.recibe || '—'}</span>
-                        <span>${s.hora || ''}</span>
+                    <div style="text-align:right;">
+                        <div style="font-size:18px;">${esT ? '🚌' : '🧾'}</div>
+                        <div style="font-weight:bold;color:#284B87;margin-top:4px;">${formatCant(s.cantidad)} u.</div>
                     </div>
                 </div>`;
 
@@ -241,15 +246,12 @@ function renderMobile(grupos) {
             card.addEventListener('touchstart',  e => iniciarLongPress(e, s), { passive: true });
             card.addEventListener('touchend',    cancelarLongPress);
             card.addEventListener('touchcancel', cancelarLongPress);
-            // También mousedown para tablets
             card.addEventListener('mousedown', e => iniciarLongPress(e, s));
             card.addEventListener('mouseup',   cancelarLongPress);
 
-            filasDiv.appendChild(card);
+            grupo.appendChild(card);
         });
 
-        grupo.appendChild(header);
-        grupo.appendChild(filasDiv);
         cont.appendChild(grupo);
     });
 }
@@ -296,6 +298,7 @@ function abrirSheet(salidaEditar = null) {
     document.getElementById('inputCantidad').value = '1';
     document.getElementById('inputRecibe').value = '';
     document.getElementById('selBus').value = '';
+    document.getElementById('dropdownProductos').style.display = 'none';
     renderMiniTabla();
 
     if (salidaEditar) {
@@ -327,6 +330,7 @@ function abrirSheet(salidaEditar = null) {
 function cerrarSheet() {
     document.getElementById('hojaSheet').classList.remove('visible');
     document.getElementById('overlaySheet').classList.remove('visible');
+    document.getElementById('dropdownProductos').style.display = 'none';
     itemsPendientes = [];
 }
 
@@ -359,28 +363,11 @@ function buscarProductoDropdown(texto) {
     if (!resultados.length) { drop.style.display = 'none'; return; }
 
     drop.innerHTML = '';
-
-    // Posicionar debajo del input
-    const inputEl = document.getElementById('inputProducto');
-    const rect = inputEl.getBoundingClientRect();
-    drop.style.cssText = `
-        display: block;
-        position: fixed;
-        top: ${rect.bottom + 2}px;
-        left: ${rect.left}px;
-        width: ${rect.width}px;
-        background: white;
-        border: 1.5px solid #284B87;
-        border-radius: 8px;
-        z-index: 9999;
-        max-height: 220px;
-        overflow-y: auto;
-        box-shadow: 0 6px 20px rgba(0,0,0,.15);
-    `;
+    drop.style.display = 'block';
 
     resultados.forEach(p => {
         const div = document.createElement('div');
-        div.style.cssText = 'padding:11px 14px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:13px;background:white;';
+        div.className = 'dropdown-item';
         div.innerHTML = `<strong style="color:#284B87">${p.codigo}</strong> <span style="color:#64748b;">— ${p.descripcion}</span>`;
 
         const seleccionar = () => {
@@ -391,8 +378,6 @@ function buscarProductoDropdown(texto) {
 
         div.addEventListener('mousedown', seleccionar);
         div.addEventListener('touchstart', seleccionar, { passive: true });
-        div.addEventListener('mouseover',  () => div.style.background = '#f1f5f9');
-        div.addEventListener('mouseout',   () => div.style.background = 'white');
         drop.appendChild(div);
     });
 }
@@ -427,6 +412,7 @@ function agregarItemPendiente() {
     productoSeleccionado = null;
     document.getElementById('inputProducto').value = '';
     document.getElementById('inputCantidad').value = '1';
+    document.getElementById('dropdownProductos').style.display = 'none';
     renderMiniTabla();
 }
 
@@ -438,7 +424,7 @@ function quitarItemPendiente(idx) {
 function renderMiniTabla() {
     const tbody = document.getElementById('miniTablaBody');
     if (!itemsPendientes.length) {
-        tbody.innerHTML = `<tr><td colspan="4" class="mini-tabla-vacia">Aún no hay items. Agrega productos arriba.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" class="mini-tabla-vacia" style="text-align:center;color:#94a3b8;padding:15px;">Aún no hay items. Agrega productos arriba.</td></tr>`;
         return;
     }
     tbody.innerHTML = '';
@@ -448,7 +434,7 @@ function renderMiniTabla() {
             <td class="mt-codigo">${item.codigo}</td>
             <td class="mt-desc">${item.descripcion}</td>
             <td class="mt-cant">${formatCant(item.cantidad)}</td>
-            <td class="mt-del"><button class="btn-mini-del" onclick="quitarItemPendiente(${idx})">✕</button></td>`;
+            <td class="mt-del"><button class="btn-mini-del" onclick="quitarItemPendiente(${idx})" style="background:none;border:none;cursor:pointer;color:#dc2626;font-weight:bold;">✕</button></td>`;
         tbody.appendChild(tr);
     });
 }
@@ -483,6 +469,8 @@ async function confirmarSalidas() {
     const tipo = modoActual;
 
     try {
+        let conteoGuardadas = 0;
+
         for (const item of itemsPendientes) {
             // ── EDICIÓN: primero revertir stock anterior, luego aplicar nuevo ──
             if (item._editId) {
@@ -490,7 +478,7 @@ async function confirmarSalidas() {
                 await ajustarStock(item._codigoOriginal, item._cantidadOriginal); // suma de vuelta
 
                 // 2. Actualizar la salida en supabase
-                await sb.from('salidas').update({
+                const { error: errUpdate } = await sb.from('salidas').update({
                     codigo:   item.codigo,
                     cantidad: String(item.cantidad),
                     recibe:   recibe,
@@ -498,12 +486,14 @@ async function confirmarSalidas() {
                     bus:      idBus || null,
                 }).eq('id', item._editId);
 
+                if (errUpdate) throw errUpdate;
+
                 // 3. Descontar el nuevo stock
                 await ajustarStock(item.codigo, -item.cantidad);
 
             } else {
                 // ── INSERCIÓN NUEVA ──
-                await sb.from('salidas').insert({
+                const { error: errInsert } = await sb.from('salidas').insert({
                     fecha:    hoy,
                     codigo:   item.codigo,
                     cantidad: String(item.cantidad),
@@ -513,19 +503,23 @@ async function confirmarSalidas() {
                     bus:      idBus || null,
                 });
 
+                if (errInsert) throw errInsert;
+
                 await ajustarStock(item.codigo, -item.cantidad);
             }
+
+            conteoGuardadas++;
         }
 
         cerrarSheet();
         await cargarSalidas();
         await cargarProductos(); // refrescar stocks locales
         renderizarTodo(document.getElementById('txtBuscar').value);
-        mostrarToast(`${itemsPendientes.length} salida${itemsPendientes.length!==1?'s':''} guardada${itemsPendientes.length!==1?'s':''}`, 'ok');
+        mostrarToast(`${conteoGuardadas} salida${conteoGuardadas!==1?'s':''} guardada${conteoGuardadas!==1?'s':''}`, 'ok');
 
     } catch (err) {
-        console.error(err);
-        mostrarToast('Error al guardar: ' + err.message, 'err');
+        console.error('Error guardando:', err);
+        mostrarToast('Error al guardar: ' + (err.message || 'Error desconocido'), 'err');
     } finally {
         btn.disabled = false;
         btn.textContent = 'Confirmar y guardar';
@@ -658,7 +652,7 @@ function horaActual() {
     let h = d.getHours(), m = d.getMinutes();
     const ampm = h >= 12 ? 'PM' : 'AM';
     h = h % 12 || 12;
-    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}${ampm}`;
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')} ${ampm}`;
 }
 
 let toastTimer = null;

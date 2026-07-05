@@ -5,12 +5,11 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let listaBuses = [];
 let listaSalidas = [];
-let mapaProductos = new Map(); // Optimización: Búsquedas instantáneas O(1)
+let mapaProductos = new Map(); 
 let timeoutBusqueda;
 
-// Función global para abrir la foto en grande (Modal)
 function abrirVisorImagen(urlFoto) {
-    if (!urlFoto) return; // Si no hay foto (es placeholder), no hace nada
+    if (!urlFoto) return; 
     const modal = document.getElementById('visorImagenModal');
     const img = document.getElementById('imgVisorCompleto');
     if (modal && img) {
@@ -32,18 +31,14 @@ function formatoFechaVisual(fechaStr) {
     return `${fechaStr[8]}${fechaStr[9]}/${fechaStr[5]}${fechaStr[6]}/${fechaStr[2]}${fechaStr[3]}`;
 }
 
-// 🚀 OPTIMIZACIÓN 1: Carga paralela ultra rápida
 async function inicializarBuses() {
     try {
         console.time("⚡ Carga Paralela Supabase");
-        
-        // Lanza las 3 consultas en simultáneo
         const [resBuses, resSalidas, resProductos] = await Promise.all([
             supabaseClient.from("buses").select("id, fecha, bus, placa, cliente, estado, foto"),
             supabaseClient.from("salidas").select("id, fecha, codigo, cantidad, hora, recibe, tipo, bus"),
             supabaseClient.from("productos").select("codigo, descripcion, precio_venta")
         ]);
-
         console.timeEnd("⚡ Carga Paralela Supabase");
 
         if (resBuses.error || resSalidas.error || resProductos.error) {
@@ -53,7 +48,6 @@ async function inicializarBuses() {
         listaBuses = resBuses.data || [];
         listaSalidas = resSalidas.data || [];
         
-        // Estructura de diccionario rápido
         mapaProductos.clear();
         (resProductos.data || []).forEach(p => mapaProductos.set(p.codigo, p));
 
@@ -65,14 +59,13 @@ async function inicializarBuses() {
 
 function renderizarBuses(datosBuses) {
     const contenedor = document.getElementById("contenedorBuses");
+    if (!contenedor) return;
     if (datosBuses.length === 0) {
         contenedor.innerHTML = `<p style="text-align:center; color:#284B87; padding:20px; font-weight:bold;">No se encontraron registros.</p>`;
         return;
     }
 
     let html = "";
-    
-    // Agrupar salidas por bus en memoria para evitar hacer filtros pesados repetitivos
     const salidasPorBus = {};
     listaSalidas.forEach(s => {
         if (!salidasPorBus[s.bus]) salidasPorBus[s.bus] = [];
@@ -80,7 +73,6 @@ function renderizarBuses(datosBuses) {
     });
 
     datosBuses.forEach(vehiculo => {
-        // Busca por ID o por nombre de bus de forma eficiente
         const salidasDelBus = (salidasPorBus[vehiculo.id] || []).concat(salidasPorBus[vehiculo.bus] || []);
         
         let totalAcumulado = 0;
@@ -88,7 +80,6 @@ function renderizarBuses(datosBuses) {
         let tarjetasMovilHtml = "";
 
         salidasDelBus.forEach(salida => {
-            // 🚀 OPTIMIZACIÓN 3: Búsqueda instantánea del producto usando el Map
             const prodReferencia = mapaProductos.get(salida.codigo);
             const descripcion = prodReferencia ? prodReferencia.descripcion : "Servicio / Mano de obra";
             const precioVenta = prodReferencia ? Number(prodReferencia.precio_venta ?? 0) : 0;
@@ -133,7 +124,19 @@ function renderizarBuses(datosBuses) {
             ? `<img src="${vehiculo.foto}" alt="Bus" class="bus-foto">` 
             : `<div class="bus-foto-placeholder">Bus</div>`;
 
-        // 🚀 MEJORA UX: Se agregó onclick con stopPropagation para el zoom de la imagen
+        const esFacturado = vehiculo.estado === "FACTURADO" || vehiculo.estado === "FACTURADO_INTERNO";
+        
+        let btnTexto = "Facturar";
+        if (vehiculo.estado === "FACTURADO") btnTexto = "Facturado (Siigo) ✓";
+        if (vehiculo.estado === "FACTURADO_INTERNO") btnTexto = "Facturado (Interno) ✓";
+        
+        const btnEstilo = esFacturado ? "background:#10b981; cursor:not-allowed;" : "";
+        const btnDeshabilitado = esFacturado ? "disabled" : "";
+
+        // Escapar comillas simples para evitar roturas de sintaxis en el HTML inline
+        const nombreEscapado = (vehiculo.bus ?? "Bus sin nombre").replace(/'/g, "\\'");
+        const placaEscapada = (vehiculo.placa ?? "---").replace(/'/g, "\\'");
+
         html += `
         <div class="bus-item" id="bus-${vehiculo.id}">
             <div class="bus-header" onclick="toggleAcordeonBuses('bus-${vehiculo.id}')">
@@ -158,7 +161,7 @@ function renderizarBuses(datosBuses) {
                 </div>
                 <div class="mobile-cards-salidas">${tarjetasMovilHtml}</div>
                 <div class="panel-acciones">
-                    <button class="btn-facturar" onclick="solicitarFacturacion('${vehiculo.id}', '${vehiculo.bus}')">Facturar</button>
+                    <button class="btn-facturar" style="${btnEstilo}" ${btnDeshabilitado} id="btn-fac-${vehiculo.id}" onclick="event.stopPropagation(); abrirPasarelaFacturacion('${vehiculo.id}', '${nombreEscapado}', '${placaEscapada}')">${btnTexto}</button>
                 </div>
             </div>
         </div>`;
@@ -176,11 +179,78 @@ function toggleAcordeonBuses(idElemento) {
     if (!estaAbierto) itemActual.classList.add("abierto");
 }
 
-function solicitarFacturacion(id, nombreBus) {
-    alert(`Solicitud enviada para facturar el bus: ${nombreBus}`);
+/* ==========================================================================
+   🚀 CANALES DE FACTURACIÓN (LLAMADOS DESDE LA PASARELA INTERACTIVA DEL HTML)
+   ========================================================================== */
+
+// Opción A: Facturación Electrónica Oficial Siigo
+async function lanzarFacturacionSiigo(id, infoBus) {
+    const boton = document.getElementById(`btn-fac-${id}`);
+    if (!boton) return;
+
+    try {
+        boton.disabled = true;
+        boton.innerText = "Procesando Siigo...";
+        boton.style.background = "#4b5563";
+
+        // Llamada directa a tu Edge Function en Supabase
+        const { data, error } = await supabaseClient.functions.invoke('facturar-siigo', {
+            body: { busId: id }
+        });
+
+        if (error) throw error;
+
+        alert(`¡Factura generada con éxito en Siigo para el bus ${infoBus.nombre}!`);
+        boton.innerText = "Facturado (Siigo) ✓";
+        boton.style.background = "#10b981";
+        
+        const bus = listaBuses.find(b => b.id === id);
+        if (bus) bus.estado = "FACTURADO";
+
+    } catch (err) {
+        console.error("Error en facturación Siigo:", err);
+        alert(`No se pudo completar la facturación en Siigo: ${err.message || err}`);
+        boton.disabled = false;
+        boton.innerText = "Facturar";
+        boton.style.background = "#284B87";
+    }
 }
 
-// Buscador reactivo rápido con debounce optimizado a 100ms
+// Opción B: Facturación / Remisión Interna Local
+async function lanzarFacturacionInterna(id, infoBus) {
+    const boton = document.getElementById(`btn-fac-${id}`);
+    if (!boton) return;
+
+    try {
+        boton.disabled = true;
+        boton.innerText = "Guardando Interno...";
+        boton.style.background = "#4b5563";
+
+        // Actualizamos el estado directamente en la tabla 'buses' en Supabase como 'FACTURADO_INTERNO'
+        const { error } = await supabaseClient
+            .from("buses")
+            .update({ estado: "FACTURADO_INTERNO" })
+            .eq("id", id);
+
+        if (error) throw error;
+
+        alert(`¡Remisión interna registrada con éxito para el bus ${infoBus.nombre}!`);
+        boton.innerText = "Facturado (Interno) ✓";
+        boton.style.background = "#10b981";
+        
+        const bus = listaBuses.find(b => b.id === id);
+        if (bus) bus.estado = "FACTURADO_INTERNO";
+
+    } catch (err) {
+        console.error("Error en facturación interna:", err);
+        alert(`No se pudo registrar la remisión interna: ${err.message || err}`);
+        boton.disabled = false;
+        boton.innerText = "Facturar";
+        boton.style.background = "#284B87";
+    }
+}
+
+// Búsqueda en tiempo real
 document.getElementById("txtBuscar").addEventListener("input", function () {
     clearTimeout(timeoutBusqueda);
     const texto = this.value.trim().toUpperCase();
@@ -198,9 +268,7 @@ document.getElementById("txtBuscar").addEventListener("input", function () {
     }, 100);
 });
 
-/* ==========================================================================
-   📱 INTERFAZ FLOTANTE INTERACTIVA CON RENDERIZADO INMEDIATO (OPTIMIZADO)
-   ========================================================================== */
+// Inicializadores de interfaz y carga del documento
 document.addEventListener("DOMContentLoaded", () => {
     const btnAbrirFlotante = document.getElementById('btnAbrirFlotante');
     const overlayFlotante = document.getElementById('overlayFlotante');
@@ -245,7 +313,6 @@ document.addEventListener("DOMContentLoaded", () => {
         frmNuevoBus.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            // Cerrar el modal inmediatamente para dar respuesta UX instantánea al usuario
             const bus = document.getElementById('regBus').value;
             const placa = document.getElementById('regPlaca').value.toUpperCase().replace(/\s+/g, '');
             const fotoFile = inputFoto ? inputFoto.files[0] : null;
@@ -253,7 +320,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const idUnico = 'BUS-' + Date.now();
             const fechaActual = new Date().toISOString().split('T')[0];
             
-            // 🚀 OPTIMIZACIÓN 2: Pre-renderizado en UI antes de que termine de subir a la red
             const objetoLocalTemporal = {
                 id: idUnico,
                 fecha: fechaActual,
@@ -261,26 +327,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 placa: placa,
                 cliente: "---",
                 estado: "ABIERTO",
-                foto: fotoFile ? URL.createObjectURL(fotoFile) : '' // URL local temporal instantánea
+                foto: fotoFile ? URL.createObjectURL(fotoFile) : '' 
             };
 
             listaBuses.unshift(objetoLocalTemporal);
             renderizarBuses(listaBuses);
             cerrarModal();
 
-            // Ejecución asíncrona de fondo con la base de datos sin congelar la pantalla
             try {
                 let publicUrl = '';
                 if (fotoFile) {
                     const fileExt = fotoFile.name.split('.').pop();
                     const fileName = `${idUnico}_${placa}.${fileExt}`;
 
-                    const { data: storageData } = await supabaseClient.storage.from('buses').upload(fileName, fotoFile);
+                    await supabaseClient.storage.from('buses').upload(fileName, fotoFile);
                     const { data: urlData } = supabaseClient.storage.from('buses').getPublicUrl(fileName);
                     publicUrl = urlData?.publicUrl || '';
                 }
 
-                // Guardar datos reales en Supabase
                 await supabaseClient.from('buses').insert([{
                     id: idUnico,
                     fecha: fechaActual,
@@ -291,7 +355,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     foto: publicUrl
                 }]);
                 
-                // Actualizar la URL de la foto final en memoria sin alterar la UX
                 if (publicUrl) {
                     const busInsertado = listaBuses.find(b => b.id === idUnico);
                     if (busInsertado) busInsertado.foto = publicUrl;
@@ -304,5 +367,4 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
-// Arrancar proceso optimizado
 inicializarBuses();

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Salidas | ThermoAir</title>
+<title>Facturación | ThermoAir</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -80,7 +80,7 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
 .mobile-cards-container { display: none; }
 
 /* ── FAB ── */
-#btnNuevaSalida {
+#btnNuevaFactura {
     position: fixed;
     bottom: 28px;
     right: 28px;
@@ -99,7 +99,7 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
     justify-content: center;
 }
 
-/* ── SHEET OVERLAY FORMULARIO NUEVA SALIDA ── */
+/* ── SHEET OVERLAY FORMULARIO NUEVA FACTURA ── */
 #overlaySheet {
     display: none;
     position: fixed;
@@ -115,7 +115,7 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
     left: 50%;
     transform: translateX(-50%);
     width: 100%;
-    max-width: 550px;
+    max-width: 750px;
     background: white;
     border-radius: 20px 20px 0 0;
     box-shadow: 0 -5px 25px rgba(0,0,0,.2);
@@ -137,15 +137,32 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
     cursor: pointer;
 }
 
-.sheet-titulo {
-    color: #203764;
-    font-size: 18px;
-    font-weight: bold;
-    text-align: center;
+.sheet-header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     padding: 10px 20px;
     border-bottom: 1px solid #f1f5f9;
     flex-shrink: 0;
 }
+
+.sheet-titulo {
+    color: #203764;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.btn-limpiar {
+    background: transparent;
+    border: 1px solid #cbd5e1;
+    padding: 6px 12px;
+    border-radius: 6px;
+    color: #64748b;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+}
+.btn-limpiar:hover { background: #f1f5f9; color: #dc2626; border-color: #dc2626; }
 
 .sheet-body { 
     padding: 16px 20px; 
@@ -153,10 +170,14 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
 }
 
-/* Toggle Bus / Cliente */
+/* Grillas Estructuradas */
+.grid-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid-tres { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+
+/* Toggle Producto / Mano de obra */
 .toggle-tipo {
     display: flex;
     background: #f1f5f9;
@@ -181,7 +202,7 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
 }
 
 /* Campos del form */
-.campo { display: flex; flex-direction: column; }
+.campo { display: flex; flex-direction: column; position: relative; }
 .campo label {
     font-size: 11px;
     font-weight: bold;
@@ -202,7 +223,7 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
 }
 .campo input:focus, .campo select:focus { border-color: #284B87; }
 
-/* ── CAJA CONTENEDORA GRIS DEL BUSCADOR ── */
+/* ── CAJA CONTENEDORA GRIS DEL BUSCADOR DE ITEMS ── */
 .buscador-productos-box {
     background: #f8fafc;
     border: 1.5px solid #e2e8f0;
@@ -212,25 +233,30 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
     flex-direction: column;
     gap: 12px;
     width: 100%;
-    position: relative; /* BASE PARA POSITIONING ABSOLUTO DEL DROPDOWN */
+    position: relative;
 }
 
-/* ── DROPDOWN PRODUCTOS: ABSOLUTO RELATIVO AL CONTENEDOR ── */
-#dropdownProductos {
+/* ── DROPDOWN PREDICTIVOS ── */
+.dropdown-predictivo {
     display: none;
     background: white;
     border: 1.5px solid #284B87;
     border-radius: 8px;
-    max-height: 200px;
+    max-height: 180px;
     overflow-y: auto;
-    
-    /* Positioning absoluto dentro de .buscador-productos-box */
     position: absolute;
-    top: 72px; /* Justo debajo del input de producto */
+    top: 68px;
+    left: 0;
+    right: 0;
+    z-index: 1200;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+}
+
+/* Variación específica del dropdown interno de la caja de productos */
+.buscador-productos-box .dropdown-predictivo {
     left: 12px;
     right: 12px;
-    z-index: 1100;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+    top: 72px;
 }
 
 .dropdown-item {
@@ -242,24 +268,42 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
 }
 .dropdown-item:hover { background: #dfe9ff; color: #203764; }
 
-/* Mini tabla de items agregados */
+.mini-tabla-titulo {
+    font-size: 12px;
+    font-weight: bold;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    margin-top: 5px;
+    margin-bottom: -5px;
+}
+
 .mini-tabla-wrap {
-    border: 1px solid #e2e8f0;
+    border: 1.5px solid #cbd5e1;
     border-radius: 8px;
     overflow-y: auto;
-    max-height: 150px;
+    min-height: 140px;
+    max-height: 220px;
     background: white;
+    width: 100%;
+    display: block !important; /* Forzar renderizado */
 }
 .mini-tabla-wrap table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .mini-tabla-wrap thead th {
     background: #475569;
     color: white;
-    padding: 8px 10px;
+    padding: 10px 12px;
     text-align: left;
     position: sticky;
     top: 0;
+    z-index: 10;
 }
-.mini-tabla-wrap tbody td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; }
+.mini-tabla-wrap tbody td { 
+    padding: 10px 12px; 
+    border-bottom: 1px solid #e2e8f0; 
+    color: #1f2937;
+    vertical-align: middle;
+}
 
 .btn-agregar-item {
     width: 100%;
@@ -274,6 +318,25 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
 }
 .btn-agregar-item:hover { background: #203764; }
 
+.panel-totales {
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.total-linea { display: flex; justify-content: space-between; font-size: 14px; color: #475569; }
+.total-linea.gran-total {
+    font-size: 20px;
+    font-weight: bold;
+    color: #203764;
+    border-top: 1.5px dashed #cbd5e1;
+    padding-top: 8px;
+    margin-top: 2px;
+}
+
 .btn-confirmar {
     width: 100%;
     padding: 14px;
@@ -284,8 +347,10 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
     font-size: 16px;
     font-weight: bold;
     cursor: pointer;
-    margin-top: auto;
+    flex-shrink: 0;
+    margin-top: 5px;
 }
+.btn-confirmar:hover { background: #059669; }
 
 /* ── MENU CONTEXTUAL ── */
 #menuContextual {
@@ -350,14 +415,6 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
         max-height: 100vh; 
         border-radius: 0; 
     }
-
-    /* Dropdown en móvil también usa absolute relativo al contenedor */
-    #dropdownProductos {
-        position: absolute;
-        top: 72px;
-        left: 12px;
-        right: 12px;
-    }
 }
 </style>
 </head>
@@ -367,106 +424,169 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
     <div class="logo-area">
         <img src="Logo/Imagotipo_ThermoAir.svg" alt="ThermoAir" class="logo">
         <div class="separador"></div>
-        <div class="modulo">Gestión</div>
+        <div class="modulo">Facturación</div>
     </div>
     <a href="index_gestion.html">← Menú principal</a>
 </header>
 
 <main>
-    <h2>Salidas de Bodega</h2>
-    <input type="text" id="txtBuscar" placeholder="Buscar registros anteriores...">
+    <h2>Historial de Facturas de Venta</h2>
+    <input type="text" id="txtBuscar" placeholder="Buscar por cliente, NIT, ID o placa de vehículo...">
 
     <div class="table-container" id="vistaPC">
         <table>
             <thead>
                 <tr>
-                    <th>CÓDIGO</th>
-                    <th>DESCRIPCIÓN</th>
-                    <th>CANT.</th>
-                    <th>HORA</th>
-                    <th>RECIBE / CLIENTE</th>
-                    <th>TIPO</th>
-                    <th>BUS</th>
+                    <th>FECHA</th>
+                    <th>Nº FACTURA</th>
+                    <th>CLIENTE / RAZÓN SOCIAL</th>
+                    <th>NIT / CC</th>
+                    <th>VEHÍCULO</th>
+                    <th style="text-align: right;">SUBTOTAL</th>
+                    <th style="text-align: right;">DESCUENTO</th>
+                    <th style="text-align: right;">TOTAL NETO</th>
                 </tr>
             </thead>
-            <tbody id="tablaBody"></tbody>
+            <tbody id="tablaBodyFacturas"></tbody>
         </table>
     </div>
 
-    <div class="mobile-cards-container" id="vistaMobile"></div>
+    <div class="mobile-cards-container" id="vistaMobileFacturas"></div>
 </main>
 
-<button id="btnNuevaSalida" title="Nueva salida">+</button>
+<button id="btnNuevaFactura" title="Nueva Factura de Venta">+</button>
 
 <div id="overlaySheet"></div>
 <div id="hojaSheet">
     <div class="sheet-handle" id="sheetHandle"></div>
-    <div class="sheet-titulo" id="sheetTitulo">Nueva Salida</div>
+    <div class="sheet-header-container">
+        <div class="sheet-titulo" id="lblTituloFormulario">Nueva Factura de Venta</div>
+        <button id="btnLimpiarFactura" class="btn-limpiar">Limpiar Formulario</button>
+    </div>
     
     <div class="sheet-body">
-        <div class="toggle-tipo">
-            <button id="btnModoVenta" class="activo" onclick="setModo('V')">🧾 Venta / Cliente</button>
-            <button id="btnModoBus" onclick="setModo('T')">🚌 Bus en servicio</button>
-        </div>
-
-        <div class="campo" id="campoBus" style="display:none;">
-            <label>Bus</label>
-            <select id="selBus">
-                <option value="">— Seleccionar bus —</option>
-            </select>
-        </div>
-
+        
         <div class="campo">
-            <label id="labelRecibe">Cliente</label>
-            <input type="text" id="inputRecibe" placeholder="Nombre de quien recibe">
+            <label>Buscador de Clientes</label>
+            <input type="text" id="comboCliente" placeholder="Escriba nombre o NIT para buscar..." autocomplete="off">
+            <div id="dropdownClientes" class="dropdown-predictivo"></div>
+        </div>
+
+        <div class="grid-dos">
+            <div class="campo"><label>Razón Social / Nombre</label><input type="text" id="txtEmpresa"></div>
+            <div class="campo"><label>NIT / Cédula</label><input type="text" id="txtNitCc"></div>
+        </div>
+
+        <div class="grid-dos">
+            <div class="campo"><label>Dirección</label><input type="text" id="txtDireccion"></div>
+            <div class="campo"><label>Ciudad</label><input type="text" id="txtCiudad"></div>
+        </div>
+
+        <div class="grid-dos">
+            <div class="campo"><label>Teléfono</label><input type="text" id="txtTelefono"></div>
+            <div class="campo">
+                <label>Fecha de Factura</label>
+                <div class="grid-tres">
+                    <input type="number" id="txtFechaDia" placeholder="DD">
+                    <input type="number" id="txtFechaMes" placeholder="MM">
+                    <input type="number" id="txtFechaAnio" placeholder="AAAA">
+                </div>
+            </div>
+        </div>
+
+        <div class="grid-dos">
+            <div class="campo"><label>Interno Bus Nº</label><input type="text" id="txtBusNo" placeholder="Ej: 2400"></div>
+            <div class="campo"><label>Placa Vehículo</label><input type="text" id="txtPlaca" placeholder="Ej: STR123"></div>
         </div>
 
         <hr style="border:none;border-top:1px solid #f1f5f9;margin-bottom:4px;">
 
         <div class="buscador-productos-box">
-            <div class="campo">
-                <label>Producto</label>
-                <input type="text" id="inputProducto" placeholder="Buscar código o descripción..." autocomplete="off">
-            </div>
-            
-            <div id="dropdownProductos"></div>
-
-            <div class="campo">
-                <label>Cantidad</label>
-                <input type="number" id="inputCantidad" value="1" min="0.01" step="0.01" style="text-align:center;">
+            <div class="toggle-tipo" id="toggleModoItem">
+                <button type="button" id="btnModoProducto" class="activo">Producto</button>
+                <button type="button" id="btnModoManoObra">Mano de Obra / Servicio</button>
             </div>
 
-            <button class="btn-agregar-item" onclick="agregarItemPendiente()">＋ Agregar Producto</button>
+            <div class="campo" id="campoProducto">
+                <label>Buscar Producto o Repuesto</label>
+                <input type="text" id="comboProducto" placeholder="Escriba código o descripción..." autocomplete="off">
+                <div id="dropdownProductosForm" class="dropdown-predictivo"></div>
+            </div>
+
+            <div class="campo" id="campoService" style="display: none;">
+                <label>Servicio o Mano de Obra</label>
+                <input type="text" id="comboServicio" placeholder="Escriba el concepto técnico..." autocomplete="off">
+                <div id="dropdownServicios" class="dropdown-predictivo"></div>
+            </div>
+
+            <div class="grid-dos">
+                <div class="campo"><label>Cantidad</label><input type="number" id="txtCantidadItem" value="1" style="text-align: center;"></div>
+                <div class="campo"><label>Precio Unitario ($)</label><input type="text" id="txtPrecioUnitItem" placeholder="$0"></div>
+            </div>
+
+            <button type="button" class="btn-agregar-item" id="btnAgregarItemLista">＋ Vincular Ítem al Detalle</button>
         </div>
 
+        <div class="campo" id="campoGlobalManoObra" style="display: none;">
+            <label style="color: #203764;">Precio Total De Mano De Obra</label>
+            <input type="text" id="txtPrecioManoObraGlobal" placeholder="Ingrese valor acordado si aplica">
+        </div>
+
+        <div class="mini-tabla-titulo">Ítems Listos para Facturar en esta Venta</div>
+        
         <div class="mini-tabla-wrap">
             <table>
                 <thead>
                     <tr>
-                        <th>CÓDIGO</th>
-                        <th>DESCRIPCIÓN</th>
-                        <th>CANT.</th>
-                        <th></th>
+                        <th style="width: 10%;">CANT.</th>
+                        <th style="width: 20%;">CÓDIGO</th>
+                        <th style="width: 40%;">DETALLE</th>
+                        <th style="width: 15%; text-align: right;">DESC.</th>
+                        <th style="width: 15%; text-align: right;">TOTAL</th>
+                        <th style="width: 5%;"></th>
                     </tr>
                 </thead>
-                <tbody id="miniTablaBody">
-                    <tr><td colspan="4" class="mini-tabla-vacia" style="text-align:center; color:#94a3b8; padding:15px;">Aún no hay items. Agrega productos arriba.</td></tr>
+                <tbody id="miniTablaItemsFactura">
+                    <tr>
+                        <td colspan="6" style="text-align:center; color:#94a3b8; padding:20px;">
+                            Ningún ítem agregado a la pre-venta todavía.
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </div>
 
-        <button class="btn-confirmar" id="btnConfirmar" onclick="confirmarSalidas()">Confirmar y guardar</button>
+        <div class="panel-totales">
+            <div class="campo">
+                <label>Descuento Flexible (Escriba Valor Fijo o añada %)</label>
+                <input type="text" id="txtDescuentoGlobal" placeholder="Ej: 25000 o 15%">
+            </div>
+            <div class="total-linea">
+                <span>Subtotal Bruto:</span>
+                <span id="lblSubtotalBruto">$0</span>
+            </div>
+            <div class="total-linea">
+                <span>Descuento Aplicado:</span>
+                <span id="lblDescuentoAplicado" style="color: #dc2626;">-$0</span>
+            </div>
+            <div class="total-linea gran-total">
+                <span>TOTAL NETO:</span>
+                <span id="lblTotalNeto">$0</span>
+            </div>
+        </div>
+
+        <button type="button" class="btn-confirmar" id="btnConfirmarGenerarFactura">Confirmar y Generar Factura</button>
     </div>
 </div>
 
 <div id="menuContextual">
-    <div class="menu-item" onclick="editarSalidaDesdeMenu()">✏️ Editar</div>
+    <div class="menu-item">Editar Factura</div>
     <div class="menu-sep"></div>
-    <div class="menu-item danger" onclick="eliminarSalidaDesdeMenu()">🗑️ Eliminar</div>
+    <div class="menu-item danger">Anular Factura</div>
 </div>
 
 <div id="toast"></div>
 
-<script src="salidas.js"></script>
+<script src="facturas.js"></script>
 </body>
 </html>
