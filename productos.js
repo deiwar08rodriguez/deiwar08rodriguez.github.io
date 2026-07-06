@@ -159,14 +159,13 @@ function abrirModalEditar(codigo) {
     document.getElementById("txtPrecioCompra").value = producto.precio_compra ?? 0;
     document.getElementById("txtPrecioVenta").value = producto.precio_venta ?? 0;
     document.getElementById("txtStock").value = producto.stock ?? 0;
+    actualizarMargenUI(); 
 
-    actualizarMargenUI();
-
-    document.getElementById("editModal").classList.add("active");
+    document.getElementById("editModal").classList.add("visible"); 
 }
 
 function cerrarModal() {
-    document.getElementById("editModal").classList.remove("active");
+    document.getElementById("editModal").classList.remove("visible");
     mCodigoActual = "";
 }
 
