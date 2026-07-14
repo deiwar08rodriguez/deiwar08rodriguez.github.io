@@ -4,15 +4,16 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let productos = [];
-let categoriasCache = [];     // [{categoria, codigo}]
-let subcategoriasCache = [];  // [{categorias, subcategorias, codigo}]
+let categoriasCache = [];   
+let subcategoriasCache = []; 
 let timeoutBusqueda;
 
 // Variables de estado del formulario de EDICIÓN
 let mCodigoActual = "";
 let mStockOriginal = 0;
 let mPrecioCompraOriginal = 0;
-
+let mDescripcionOriginal = "";
+let mPrecioVentaOriginal = 0;
 // ===================== UTILIDADES =====================
 
 function formatoMoneda(valor) {
@@ -28,8 +29,12 @@ function calcularMargenThermoAir(precioVenta, precioCompra) {
     if (precioVenta === null || precioCompra === null) return 0;
     if (precioVenta === "" || precioCompra === "") return 0;
 
-    const pv = Number(String(precioVenta).replace(",", "."));
-    const pc = Number(String(precioCompra).replace(",", "."));
+    // Convertir a string y limpiar formato colombiano (eliminar puntos de miles)
+    let pvStr = String(precioVenta).replace(/\./g, "").trim();
+    let pcStr = String(precioCompra).replace(/\./g, "").trim();
+    
+    const pv = parseFloat(pvStr) || 0;
+    const pc = parseFloat(pcStr) || 0;
 
     if (isNaN(pv) || isNaN(pc)) return 0;
     if (pc <= 0) return 0;
@@ -49,6 +54,25 @@ function normalizarBusqueda(v) {
         .replace(/Ñ/g, "N");
     s = s.replace(/\s+/g, " ");
     return s.trim();
+}
+
+// Funciones de máscara tipo facturas_compras.js
+function maskPrecio(val) {
+    let limpia = String(val).replace(/[^0-9]/g, "");
+    if (!limpia || limpia === "0") return "$0";
+    return "$" + parseInt(limpia, 10).toLocaleString('es-CO');
+}
+
+function maskMargen(val) {
+    let esNegativo = String(val).includes('-');
+    let limpia = String(val).replace(/[^0-9]/g, "");
+    if (!limpia || limpia === "0") return "%0";
+    return (esNegativo ? "-%" : "%") + parseInt(limpia, 10);
+}
+
+function limpiarValorMonedaAFloat(texto) {
+    let limpio = texto.replace(/\./g, "").replace(/,/g, ".").replace(/[^0-9.]/g, "");
+    return parseFloat(limpio) || 0;
 }
 
 // ===================== CARGA DE PRODUCTOS =====================
@@ -148,6 +172,8 @@ function abrirModalEditar(codigo) {
     mCodigoActual = producto.codigo;
     mStockOriginal = Number(producto.stock ?? 0);
     mPrecioCompraOriginal = Number(producto.precio_compra ?? 0);
+    mDescripcionOriginal = producto.descripcion ?? "";
+    mPrecioVentaOriginal = Number(producto.precio_venta ?? 0);
 
     document.getElementById("lblCodigo").innerText = producto.codigo ?? "";
     document.getElementById("lblCategoria").innerText = producto.categoria ?? "";
@@ -156,9 +182,16 @@ function abrirModalEditar(codigo) {
     document.getElementById("txtDescripcion").value = producto.descripcion ?? "";
     document.getElementById("txtProveedor").value = producto.proveedor ?? "";
     document.getElementById("txtCodigoProv").value = producto.codigo_prov ?? "";
-    document.getElementById("txtPrecioCompra").value = producto.precio_compra ?? 0;
-    document.getElementById("txtPrecioVenta").value = producto.precio_venta ?? 0;
-    document.getElementById("txtStock").value = producto.stock ?? 0;
+    
+    // Mostrar valores sin formato (los listeners los formatearán automáticamente)
+    document.getElementById("txtPrecioCompra").value = String(mPrecioCompraOriginal);
+    document.getElementById("txtPrecioVenta").value = String(mPrecioVentaOriginal);
+    document.getElementById("txtStock").value = String(mStockOriginal);
+    
+    // Dispara los listeners para que formateen automáticamente
+    document.getElementById("txtPrecioCompra").dispatchEvent(new Event('input', { bubbles: true }));
+    document.getElementById("txtPrecioVenta").dispatchEvent(new Event('input', { bubbles: true }));
+    
     actualizarMargenUI(); 
 
     document.getElementById("editModal").classList.add("visible"); 
@@ -176,8 +209,65 @@ function actualizarMargenUI() {
     document.getElementById("txtMargen").value = (margen * 100).toFixed(1) + "%";
 }
 
-document.getElementById("txtPrecioVenta").addEventListener("input", actualizarMargenUI);
-document.getElementById("txtPrecioCompra").addEventListener("input", actualizarMargenUI);
+// ============ LISTENERS EXACTOS COMO FACTURAS_COMPRAS.JS ============
+
+// Precio Compra - Formato X.XXX.XXX (colombiano)
+const txtPrecioCompraInput = document.getElementById("txtPrecioCompra");
+if (txtPrecioCompraInput) {
+    txtPrecioCompraInput.addEventListener('input', (e) => {
+        // Extraer solo números
+        let limpia = e.target.value.replace(/[^0-9]/g, "");
+        
+        if (limpia === "") {
+            e.target.value = "0";
+        } else {
+            let valorNumerico = parseInt(limpia, 10) || 0;
+            // Máscara: formato colombiano con puntos de miles
+            e.target.value = valorNumerico.toLocaleString('es-CO');
+        }
+        
+        actualizarMargenUI();
+    });
+}
+
+// Precio Venta - Formato X.XXX.XXX (colombiano)
+const txtPrecioVentaInput = document.getElementById("txtPrecioVenta");
+if (txtPrecioVentaInput) {
+    txtPrecioVentaInput.addEventListener('input', (e) => {
+        // Extraer solo números
+        let limpia = e.target.value.replace(/[^0-9]/g, "");
+        
+        if (limpia === "") {
+            e.target.value = "0";
+        } else {
+            let valorNumerico = parseInt(limpia, 10) || 0;
+            // Máscara: formato colombiano con puntos de miles
+            e.target.value = valorNumerico.toLocaleString('es-CO');
+        }
+        
+        actualizarMargenUI();
+    });
+}
+
+// Stock - Permite decimales
+const txtStockInput = document.getElementById("txtStock");
+if (txtStockInput) {
+    txtStockInput.addEventListener('input', (e) => {
+        // Permitir solo números y UN punto decimal
+        let limpia = e.target.value.replace(/[^0-9.]/g, "");
+        let partes = limpia.split(".");
+        
+        if (partes.length > 2) {
+            limpia = partes[0] + "." + partes[1];
+        }
+        
+        if (limpia === "" || limpia === ".") {
+            e.target.value = "0";
+        } else {
+            e.target.value = limpia;
+        }
+    });
+}
 
 document.getElementById("btnGuardar").addEventListener("click", async function () {
     if (!mCodigoActual) return;
@@ -189,9 +279,15 @@ document.getElementById("btnGuardar").addEventListener("click", async function (
     const descripcion = document.getElementById("txtDescripcion").value.trim();
     const proveedor = document.getElementById("txtProveedor").value.trim();
     const codigoProv = document.getElementById("txtCodigoProv").value.trim();
-    const precioCompra = Number(document.getElementById("txtPrecioCompra").value ?? 0);
-    const precioVenta = Number(document.getElementById("txtPrecioVenta").value ?? 0);
-    const stockNuevo = Number(document.getElementById("txtStock").value ?? 0);
+    
+    // Parsear valores que ahora son texto formateado (1.350.000)
+    const precioCompraStr = document.getElementById("txtPrecioCompra").value.replace(/\./g, "");
+    const precioVentaStr = document.getElementById("txtPrecioVenta").value.replace(/\./g, "");
+    const stockStr = document.getElementById("txtStock").value.replace(/\./g, "");
+    
+    const precioCompra = parseFloat(precioCompraStr) || 0;
+    const precioVenta = parseFloat(precioVentaStr) || 0;
+    const stockNuevo = parseFloat(stockStr) || 0;
 
     const fechaActual = new Date().toISOString().split('T')[0];
     const horaActual = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -220,7 +316,8 @@ document.getElementById("btnGuardar").addEventListener("click", async function (
 
         const productoEditado = registroModificado[0];
 
-        if (productoEditado.codigo) {
+        // CONDICIONAL: Solo sincronizar con Siigo si cambió el nombre o el precio de venta
+        if (productoEditado.codigo && (descripcion !== mDescripcionOriginal || precioVenta !== mPrecioVentaOriginal)) {
             btnGuardar.innerText = "Sincronizando con Siigo...";
             btnGuardar.disabled = true; 
 
@@ -246,7 +343,6 @@ document.getElementById("btnGuardar").addEventListener("click", async function (
                 if (!resultadoSiigo.success) {
                     throw new Error(resultadoSiigo.error || "Error interno sin mensaje.");
                 }
-
 
             } catch (errorSiigo) {
                 console.error("Error de Siigo:", errorSiigo);
@@ -296,12 +392,11 @@ document.getElementById("btnGuardar").addEventListener("click", async function (
                 .insert([{
                     fecha: fechaActual,
                     codigo: mCodigoActual,
-                    categoria: document.getElementById("lblCategoria").innerText,
-                    subcategoria: document.getElementById("lblSubcategoria").innerText,
                     descripcion: descripcion,
                     precio_compra: precioCompra,
                     proveedor: proveedor,
-                    codigo_proveedor: codigoProv
+                    codigo_proveedor: codigoProv,
+                    estado: "MANUAL"
                 }]);
             if (errHistorial) throw new Error(`Error en tabla 'productos_compras': ${errHistorial.message}`);
         }
@@ -311,6 +406,7 @@ document.getElementById("btnGuardar").addEventListener("click", async function (
 
     } catch (error) {
         console.error("Error al procesar el guardado:", error);
+        alert("Error: " + error.message);
     } finally {
         btnGuardar.disabled = false;
         btnGuardar.innerText = "Guardar Cambios";
@@ -779,9 +875,7 @@ document.getElementById("btnGuardarAdd").addEventListener("click", async functio
 
 if (error) throw new Error(`Error insertando producto nuevo: ${error.message}`);
 
-        // ==========================================
         // NUEVO: SINCRONIZACIÓN Y RECICLAJE EN SIIGO
-        // ==========================================
         btnGuardar.innerText = "Sincronizando con Siigo...";
         
         try {
@@ -819,7 +913,6 @@ if (error) throw new Error(`Error insertando producto nuevo: ${error.message}`);
             console.error("Error de Siigo en adición:", errorSiigo);
             alert("¡Atención!: El producto se guardó en Supabase localmente, pero falló el reciclaje/activación en Siigo: " + errorSiigo.message);
         }
-        // ==========================================
 
         await cargarProductos();
 
