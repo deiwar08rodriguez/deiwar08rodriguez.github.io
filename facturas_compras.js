@@ -11,18 +11,21 @@ let lineasFactura = [];
 let filaSeleccionada = -1;  
 let archivoPDFSeleccionado = null; 
 
-// Configuración avanzada de enrutamiento para Siigo (Valores por defecto)
-let configAvanzadaSiigo = {
-    sincronizarSiigo: true,
+// Configuración avanzada de enrutamiento para Siigo (Valores por defecto montados en Window)
+window.configAvanzadaSiigo = {
+    sincronizarSiigo: false,
     actualizarPreciosSiigo: true,
     tipoComprobante: "FC-1",
-    formaPago: "credito-30",
+    pagos: [
+        { metodo: "credito-proveedores", monto: 0, activo: true },
+        { metodo: "efectivo", monto: 0, activo: false }
+    ],
     observaciones: ""
 };
 
 // --- DICCIONARIO DE PROMPTS ESPECIALIZADOS (ARQUITECTURA MULTI-PROMPT) ---
 const PROMPTS_POR_SOFTWARE = {
-WORLD_OFFICE: `
+    WORLD_OFFICE: `
     Analiza este texto colapsado de una factura de World Office.
     Sigue estas reglas ultra-estrictas basadas en sus mañas de exportación visual:
     
@@ -37,36 +40,58 @@ WORLD_OFFICE: `
     `,
 
     SIIGO: `
-    Analiza este texto de una factura de venta electrónica colombiana generado por SIIGO.
-    Extrae la información normalizando los nombres del emisor, omitiendo resoluciones de la DIAN y capturando el consecutivo corto de la factura.
-    Conviértela estrictamente a formato ISO YYYY-MM-DD (ej: "2026-06-26").
-    Convierte cualquier formato de moneda con puntos de miles a enteros estrictos.
+    Analiza el texto de esta factura electrónica de venta colombiana emitida a través del software SIIGO (o distribuidores autorizados como The Factory HKA).
+    
+    INSTRUCCIONES DE EXTRACCIÓN CRÍTICAS:
+    1. PROVEEDOR (EMISOR): Extrae el nombre o Razón Social del emisor (ej: "INVERPRIMOS S.A.S."). No confundas con el adquirente (THERMO AIR S.A.S.) ni con el proveedor tecnológico (The Factory HKA).
+    2. NÚMERO DE FACTURA (id_factura): Localiza el número de documento de la factura. Remueve cualquier prefijo de letras, espacios o caracteres que tenga al inicio y extrae ÚNICAMENTE el número consecutivo final. Ignora por completo los números de Resolución DIAN de 13 dígitos.
+    4. IMPUESTOS (iva): Busca el bloque o tabla de "Impuestos" o "Totales". Identifica el MONTO CALCULADO DEL IVA (ej: "IVA : 19.00% Base: 798,319.33 Monto/Total: 151,680.67"). El valor de "iva" DEBE ser el monto en dinero (151681), NUNCA el porcentaje (19).
+    5. TOTALES: Extrae el gran total final de la factura (ej: "TOTAL: 950,000.00").
+    6. TRATAMIENTO DE NÚMEROS: Elimina puntos de miles y redondea los decimales al entero más cercano (ej: 151,680.67 -> 151681; 199,579.83 -> 199580).
+    7. ÍTEMS (TABLA DE PRODUCTOS): Recorre la tabla de artículos. Para cada ítem extrae:
+       - 'codigo_proveedor': El código SKU o de fábrica que aparece en la columna "# Código" o similar.
+       - 'descripcion': El texto descriptivo del producto de forma literal.
+       - 'cantidad': Número entero o decimal de unidades compradas.
+       - 'costo_unitario': El valor unitario ANTES de IVA (Base Imponible).
     
     Responde ÚNICAMENTE con el objeto JSON estructurado según el esquema. Sin explicaciones ni marcas Markdown.
     `,
 
     GENERAL: `
-    Analiza el texto de una factura de compra electrónica colombiana cuyo formato de lectura visual fue colapsado en texto plano.
-    Sigue estas directrices lógicas estándar para mapear los datos:
-    
-    1. PROVEEDOR (EMISOR): Busca correos electrónicos. Si pertenece al comprador conocido (thermoair2008@hotmail.com), descártalo. El proveedor es el dueño del OTRO correo expuesto. Extrae su nombre comercial.
-    2. NÚMERO DE FACTURA (id_factura): Busca un consecutivo puro y corto (generalmente de 3 a 6 dígitos). Ignora números de resolución DIAN larguísimos e ignora números pegados inmediatamente abajo de la etiqueta "CLIENTE" o "NIT".
-    3. FECHA DE EMISIÓN: Identifica la fecha del documento y formátela estrictamente en estándar ISO YYYY-MM-DD.
-    4. MONEDAS Y VALORES: Convierte formatos con puntos de miles a enteros estrictos (ej. 193.277 -> 193277).
-    
-    Responde ÚNICAMENTE con el objeto JSON estructurado según el esquema. Sin explicaciones ni marcas Markdown.
+    Analiza este documento de factura. Actúa como un auditor contable, no solo como un extractor de texto.
+
+    1. EXTRACCIÓN DE DATOS: 
+       - Identifica Razón Social y NIT del emisor (sin caracteres especiales).
+       - Extrae el número de factura y la fecha (YYYY-MM-DD).
+       - Identifica 'iva' (moneda, no %) y 'total' (neto, suma final).
+
+    2. LÓGICA DE ÍTEMS Y CÁLCULO DE COSTO (CRÍTICO):
+       - Para cada fila de producto, extrae: código, descripción y cantidad.
+       - Para 'costo_unitario': 
+         A) Identifica el Precio Lista por unidad.
+         B) Resta cualquier descuento (%), valor de descuento ($) o bonificación asociada a la fila.
+         C) El resultado final (después de descuentos) es tu 'costo_unitario'.
+       - Regla de oro: 'costo_unitario' multiplicado por 'cantidad' debe dar un subtotal que, sumado al IVA distribuido, coincida con el 'total' de la factura. Si no coincide, revisa tu cálculo de descuento antes de generar el JSON.
+
+    3. FORMATO DE SALIDA:
+       - Genera un objeto JSON que siga estrictamente el esquema.
+       - 'costo_unitario' y 'precio_antes_iva' deben ser valores enteros.
+       - NO incluyas textos explicativos, ni Markdown, ni comentarios fuera del JSON.
+       - Si un ítem no tiene código, asígnale un identificador único basado en su descripción.
     `
-};
+    };
 
 const esquemaFacturaJSON = {
     type: "object",
     properties: {
         proveedor: { type: "string" },
-        id_factura: { type: "string" },
+        nit_proveedor: { type: "string", description: "NIT del proveedor/emisor sin puntos ni guiones, solo números y sin dígito de verificación (ej: 901964829)" },
+        id_factura: { type: "string", description: "Solo los números del consecutivo final, sin letras ni guiones" },
+        id_factura_completa: { type: "string", description: "El número original completo tal cual aparece en el PDF, conservando prefijos de letras o guiones si los tiene" },
         fecha: { type: "string", description: "Formato estricto YYYY-MM-DD" },
-        iva: { type: "integer" },
-        total: { type: "integer" },
-        items: {
+        iva: { type: "integer", description: "Monto total del IVA en dinero/pesos liquidados. NO es el porcentaje (ej: guarda 151681, NO 19)" },
+        total: { type: "integer", description: "Valor total neto de la factura (Subtotal + IVA)" },
+items: {
             type: "array",
             items: {
                 type: "object",
@@ -74,9 +99,10 @@ const esquemaFacturaJSON = {
                     codigo_proveedor: { type: "string" },
                     descripcion: { type: "string" },
                     cantidad: { type: "integer" },
-                    costo_unitario: { type: "integer" }
+                    costo_unitario: { type: "integer", description: "Costo unitario del producto ANTES de IVA" },
+                    precio_antes_iva: { type: "integer", description: "Precio unitario bruto del artículo sin IVA, idéntico a costo_unitario" }
                 },
-                required: ["codigo_proveedor", "descripcion", "cantidad", "costo_unitario"]
+                required: ["codigo_proveedor", "descripcion", "cantidad", "costo_unitario", "precio_antes_iva"]
             }
         }
     },
@@ -128,7 +154,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 async function cargarProductosMaestros() {
     const { data, error } = await supabaseClient
         .from('productos')
-        .select('row_id, codigo, descripcion, precio_compra, precio_venta');
+        .select('row_id, codigo, descripcion, precio_compra, precio_venta, proveedor, codigo_prov');
     
     if (!error) {
         dbProductos = data;
@@ -162,7 +188,7 @@ async function cargarHistorialFacturas() {
         return;
     }
 
-    data.forEach(fac => {
+data.forEach(fac => {
         const tr = document.createElement('tr');
         
         const linkPdf = fac.documento_origen 
@@ -172,15 +198,34 @@ async function cargarHistorialFacturas() {
         const totalNum = parseFloat(fac.total) || 0;
         const ivaNum = parseFloat(fac.iva) || 0;
 
+        // Inyección de lógica de auditoría visual en el listado histórico principal
+        let claseAlertaHistorial = "";
+        if (fac.items && Array.isArray(fac.items)) {
+            const tieneAlzaCritica = fac.items.some(item => {
+                const baseCosto = parseFloat(item.costo_unitario) || 0;
+                // Simulación preventiva contra rotura de datos locales
+                const factorIvaSimulado = fac.total / (fac.total - fac.iva) || 1.19;
+                const costoConIva = Math.round(baseCosto * factorIvaSimulado);
+                const matchProd = dbProductos.find(p => p.codigo === item.codigo_proveedor);
+                if (matchProd && matchProd.precio_compra > 0) {
+                    const variacion = (costoConIva - matchProd.precio_compra) / matchProd.precio_compra;
+                    return variacion > 0.05; // Alerta si supera el 5% de incremento
+                }
+                return false;
+            });
+            if (tieneAlzaCritica) claseAlertaHistorial = 'style="background-color: #fef2f2; border-left: 4px solid #ef4444;"';
+        }
+
         tr.innerHTML = `
             <td style="font-weight:bold;">${fac.id_factura}</td>
             <td>${fac.proveedor}</td>
-            <td>${fac.fecha || '-'}</td>
+            <td style="white-space:nowrap;">${fac.fecha || '-'}</td>
             <td style="text-align:center;">${linkPdf}</td>
-            <td>${formatoMoneda(totalNum - ivaNum)}</td>
-            <td>${formatoMoneda(ivaNum)}</td>
-            <td style="font-weight:bold;">${formatoMoneda(totalNum)}</td>
+            <td style="text-align:right;">${formatoMoneda(totalNum - ivaNum)}</td>
+            <td style="text-align:right;">${formatoMoneda(ivaNum)}</td>
+            <td style="font-weight:bold; text-align:right;">${formatoMoneda(totalNum)}</td>
         `;
+        if (claseAlertaHistorial) tr.setAttribute('style', tr.getAttribute('style') ? tr.getAttribute('style') + "; background-color: #fef2f2;" : "background-color: #fef2f2;");
         tbody.appendChild(tr);
     });
 }
@@ -269,14 +314,27 @@ const resData = await response.json();
                 const subtotalFactura = totalFactura - totalIva;
                 const factorIva = subtotalFactura > 0 ? (totalFactura / subtotalFactura) : 1;
 
-                document.getElementById('inputProveedor').value = facturaIA.proveedor;
+document.getElementById('inputProveedor').value = facturaIA.proveedor;
+                // Guardamos el número limpio en el input para mantener la consistencia de tus llaves
                 document.getElementById('inputIdFac').value = facturaIA.id_factura;
+                // Adjuntamos temporalmente el prefijo completo en un atributo de Window para recuperarlo al enviar a Siigo
+                window.idFacturaCompletaSiigo = facturaIA.id_factura_completa || facturaIA.id_factura;
+                // NUEVO: Guardar el NIT extraído directamente por la IA, sino fallback
+                window.nitProveedorExtraido = facturaIA.nit_proveedor ? String(facturaIA.nit_proveedor).replace(/[^0-9]/g, "").trim() : (String(facturaIA.proveedor).replace(/[^0-9]/g, "").trim() || "");
                 document.getElementById('inputFecha').value = fechaNormalizada;
                 document.getElementById('resumenIva').textContent = formatoMoneda(totalIva);
                 document.getElementById('resumenTotal').textContent = formatoMoneda(totalFactura);
 
 lineasFactura = facturaIA.items.map(item => {
-                    const match = dbProductos.find(p => p.codigo === item.codigo_proveedor);
+                    let skuFactura = item.codigo_proveedor ? String(item.codigo_proveedor).trim() : '';
+                    if (skuFactura.toUpperCase().includes("PROV:")) {
+                        const matchRegex = skuFactura.match(/PROV:\s*([^\]]+)/i);
+                        if (matchRegex) skuFactura = matchRegex[1].trim();
+                    }
+                    const match = dbProductos.find(p => 
+                        (p.codigo && p.codigo.toUpperCase() === skuFactura.toUpperCase()) || 
+                        (p.codigo_prov && p.codigo_prov.toUpperCase() === skuFactura.toUpperCase())
+                    );
                     let regularPrecios = { sugerido: 0, final: 0, margen: 0 };
                     
                     const costoBaseIA = parseFloat(item.costo_unitario) || 0;
@@ -314,7 +372,8 @@ lineasFactura = facturaIA.items.map(item => {
                         precio_sugerido: regularPrecios.sugerido,
                         precio_final: regularPrecios.final,
                         margen: regularPrecios.margen,
-                        requiere_homologacion: match ? false : true
+                        requiere_homologacion: match ? false : true,
+                        precio_unitario_sin_iva: parseFloat(item.precio_antes_iva) || parseFloat(item.costo_unitario) || 0
                     };
                 });
 
@@ -393,25 +452,32 @@ lineasFactura.forEach((linea, index) => {
             tieneErrores = true;
         }
 
-const varCostoEntero = Math.round(linea.variacion_costo * 100);
-        let badgeVar = `<span class="badge-variacion badge-neutro">0%</span>`;
+        const varCostoEntero = Math.round(linea.variacion_costo * 100);
+        let badgeVar = `<span class="badge-variacion" style="padding:2px 6px; border-radius:4px; font-size:11px; font-weight:bold; background-color:#e2e8f0; color:#475569;">0%</span>`;
+        
         if (linea.costo_anterior > 0) {
-            if (varCostoEntero > 0) {
-                badgeVar = `<span class="badge-variacion badge-alza">+${varCostoEntero}%</span>`;
+            if (varCostoEntero > 5) {
+                // Inyección visual disruptiva para alzas críticas que superan el 5% permitido
+                badgeVar = `<span class="badge-variacion" style="padding:2px 6px; border-radius:4px; font-size:11px; font-weight:bold; background-color:#fef2f2; color:#ef4444; border: 1px solid #fca5a5;">+${varCostoEntero}% </span>`;
+                tr.style.backgroundColor = "#fff5f5";
+            } else if (varCostoEntero > 0) {
+                badgeVar = `<span class="badge-variacion" style="padding:2px 6px; border-radius:4px; font-size:11px; font-weight:bold; background-color:#fffbeb; color:#d97706;">+${varCostoEntero}%</span>`;
             } else if (varCostoEntero < 0) {
-                badgeVar = `<span class="badge-variacion badge-baja">${varCostoEntero}%</span>`;
+                badgeVar = `<span class="badge-variacion" style="padding:2px 6px; border-radius:4px; font-size:11px; font-weight:bold; background-color:#f0fdf4; color:#16a34a;">${varCostoEntero}%</span>`;
             }
         } else {
-            badgeVar = `<span class="badge-variacion badge-neutro">N/A</span>`;
+            badgeVar = `<span class="badge-variacion" style="padding:2px 6px; border-radius:4px; font-size:11px; font-weight:bold; background-color:#f1f5f9; color:#64748b;">N/A</span>`;
         }
 
-tr.innerHTML = `
-            <td style="font-weight:bold;">${linea.codigo_interno}</td>
-            <td title="${linea.descripcion || linea.descripcion_original}">${linea.descripcion || linea.descripcion_original}</td>
-            <td style="text-align:center; font-weight:500;">${linea.cantidad}</td>
-            <td style="text-align:right;">${formatoMoneda(linea.costo)}</td>
-            <td style="text-align:right; font-weight:bold; color:#10b981;">${formatoMoneda(linea.precio_final)}</td>
-            <td style="text-align:center; font-weight:bold; color:#284B87;">${Math.round(linea.margen * 100)}%</td>
+        tr.innerHTML = `
+            <td style="font-weight:bold; padding:8px 4px;">${linea.codigo_interno}</td>
+<td title="${linea.descripcion || String(linea.descripcion_original).replace(/\[PROV:\s*/i, '[')}" style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:8px 4px;">
+                ${linea.descripcion || String(linea.descripcion_original).replace(/\[PROV:\s*/i, '[')}
+            </td>
+            <td style="text-align:center; font-weight:500; padding:8px 4px;">${linea.cantidad}</td>
+            <td style="text-align:right; padding:8px 4px;">${formatoMoneda(linea.costo)} ${badgeVar}</td>
+            <td style="text-align:right; font-weight:bold; color:#10b981; padding:8px 4px;">${formatoMoneda(linea.precio_final)}</td>
+            <td style="text-align:center; font-weight:bold; color:#284B87; padding:8px 4px;">${Math.round(linea.margen * 100)}%</td>
         `;
         tbody.appendChild(tr);
     });
@@ -468,9 +534,7 @@ function seleccionarFilaDetalle(index) {
     document.getElementById('inputProductoInterno').focus();
 }
 
-// =========================================================================
 // 4. BUSCADOR INTERACTIVO PARA HOMOLOGAR
-// =========================================================================
 
 const inputProductoInterno = document.getElementById('inputProductoInterno');
 const dropdown = document.getElementById('dropdownProductos');
@@ -492,35 +556,47 @@ if (inputProductoInterno && dropdown) {
 filtrados.forEach(prod => {
             const div = document.createElement('div');
             div.className = 'dropdown-item';
+            div.style.padding = "8px";
+            div.style.cursor = "pointer";
             div.textContent = `[${prod.codigo || 'S/C'}] ${prod.descripcion}`;
+            
             div.onclick = () => {
                 if (dropdown) dropdown.style.display = 'none';
                 document.getElementById('inputProductoInterno').value = `[${prod.codigo || 'PENDIENTE'}] ${prod.descripcion}`;
                 
                 const costoAnteriorNum = parseFloat(prod.precio_compra) || 0;
                 const precioActualNum = parseFloat(prod.precio_venta) || 0;
-                if (document.getElementById('txtAuditoriaCostoAnterior')) {
-                    document.getElementById('txtAuditoriaCostoAnterior').value = maskPrecio(costoAnteriorNum);
-                }
-                if (document.getElementById('txtAuditoriaPrecioActual')) {
-                    document.getElementById('txtAuditoriaPrecioActual').value = maskPrecio(precioActualNum);
+                
+                // Interceptamos la fila actual seleccionada en la mini tabla para extraer su costo real analizado
+                let costoAnalizadoActual = 0;
+                if (filaSeleccionada > -1) {
+                    costoAnalizadoActual = lineasFactura[filaSeleccionada].costo;
                 }
 
-                const txtAudCostoNue = document.getElementById('txtAuditoriaCostoNuevo');
+                // Inyección del núcleo financiero en tiempo de selección/búsqueda interactiva
+                const calculosPrecio = ejecutarAlgoritmoFinanciero(costoAnalizadoActual, costoAnteriorNum, precioActualNum);
+
+                if (document.getElementById('txtAuditoriaCostoAnterior')) document.getElementById('txtAuditoriaCostoAnterior').value = maskPrecio(costoAnteriorNum);
+                if (document.getElementById('txtAuditoriaPrecioActual')) document.getElementById('txtAuditoriaPrecioActual').value = maskPrecio(precioActualNum);
+                if (document.getElementById('txtAuditoriaCostoNuevo')) document.getElementById('txtAuditoriaCostoNuevo').value = maskPrecio(costoAnalizadoActual);
+
+                if (document.getElementById('txtPrecioSugerido')) document.getElementById('txtPrecioSugerido').value = maskPrecio(calculosPrecio.sugerido);
+                if (document.getElementById('txtPrecioFinal')) document.getElementById('txtPrecioFinal').value = maskPrecio(calculosPrecio.final);
+                if (document.getElementById('txtMargen')) document.getElementById('txtMargen').value = maskMargen(Math.round(calculosPrecio.margen * 100));
+
                 const txtAudVar = document.getElementById('txtAuditoriaVariacion');
-                if (txtAudCostoNue && txtAudVar) {
-                    const costoNuevoNum = limpiarValorMonedaAFloat(txtAudCostoNue.value);
+                if (txtAudVar) {
                     if (costoAnteriorNum > 0) {
-                        const varEntero = Math.round(((costoNuevoNum - costoAnteriorNum) / costoAnteriorNum) * 100);
+                        const varEntero = Math.round(((costoAnalizadoActual - costoAnteriorNum) / costoAnteriorNum) * 100);
                         txtAudVar.value = varEntero > 0 ? `+${varEntero}%` : `${varEntero}%`;
-                        txtAudVar.style.color = varEntero > 0 ? "#b91c1c" : (varEntero < 0 ? "#15803d" : "#475569");
+                        txtAudVar.style.color = varEntero > 5 ? "#b91c1c" : (varEntero < 0 ? "#15803d" : "#475569");
                     } else {
                         txtAudVar.value = "N/A";
                         txtAudVar.style.color = "#475569";
                     }
                 }
-                // Vincular la selección del dropdown para que ejecute la homologación interna en la fila
-                aplicarHomologacionAFila(prod);
+                
+                document.getElementById('inputProductoInterno').dataset.selectedProd = JSON.stringify(prod);
             };
             dropdown.appendChild(div);
         });
@@ -561,6 +637,10 @@ const costoAnteriorNum = parseFloat(prod.precio_compra) || 0;
             }
         }
         
+        const matchCodigoProv = item.descripcion_original ? item.descripcion_original.match(/\[PROV:\s*([^\]]+)\]/) : null;
+        const codigoProvReal = matchCodigoProv ? matchCodigoProv[1].trim() : "";
+        const proveedorActual = document.getElementById('inputProveedor')?.value || "";
+
         lineasFactura[filaSeleccionada] = {
             ...item,
             id_producto: prod.row_id,
@@ -572,6 +652,8 @@ const costoAnteriorNum = parseFloat(prod.precio_compra) || 0;
             precio_sugerido: precioSugeridoEfectivo,
             precio_final: precioFinalEfectivo,
             margen: margenEfectivo,
+            codigo_prov: codigoProvReal,
+            proveedor: proveedorActual,
             requiere_homologacion: false
         };
         
@@ -579,6 +661,7 @@ const costoAnteriorNum = parseFloat(prod.precio_compra) || 0;
         renderizarMiniTabla();
     }
 }
+
 // 5. EDICIÓN EN TIEMPO REAL CON MÁSCARAS ESTRICTAS CONTRA BORRADOS
 function maskPrecio(val) {
     let limpia = String(val).replace(/[^0-9]/g, "");
@@ -847,11 +930,27 @@ async function guardarFacturaSupabase() {
         return;
     }
 
+    const btnConf = document.getElementById('btnConfirmar');
+    let textoOriginalBtn = "";
+    if (btnConf) {
+        textoOriginalBtn = btnConf.innerHTML;
+        btnConf.disabled = true;
+        btnConf.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Guardando local y sincronizando...`;
+    }
+
     const llaveIdUnica = `${idFacturaOriginal}_${proveedor.replace(/\s+/g, '_')}`;
     let rutaDocumentoStorage = null;
 
     if (archivoPDFSeleccionado) {
-        const nombreArchivo = limpiarNombreArchivo(`${llaveIdUnica}.pdf`);
+        let nombreBase = limpiarNombreArchivo(`${llaveIdUnica}`);
+        
+        nombreBase = nombreBase
+            .replace(/\s+/g, '_')               
+            .replace(/\.+/g, '.')               
+            .replace(/[^a-zA-Z0-9_\-\.]/g, ''); 
+        
+        const nombreArchivo = `${nombreBase.replace(/\.pdf$/i, '')}.pdf`;
+
         const { data: uploadData, error: uploadErr } = await supabaseClient
             .storage
             .from('facturas_compra')
@@ -860,6 +959,7 @@ async function guardarFacturaSupabase() {
         if (uploadErr) {
             console.error("Error cargando el PDF al Storage: ", uploadErr);
             showToast("Error al almacenar el PDF adjunto.", true);
+            if (btnConf) { btnConf.disabled = false; btnConf.innerHTML = textoOriginalBtn; }
             return;
         }
         rutaDocumentoStorage = uploadData.path; 
@@ -868,85 +968,124 @@ async function guardarFacturaSupabase() {
     const { data: facData, error: facErr } = await supabaseClient
         .from('facturas_compra') 
         .insert([{
-            id_factura: llaveIdUnica, 
-            proveedor: proveedor,
-            fecha: fecha,
+            id_factura: String(llaveIdUnica), 
+            proveedor: String(proveedor),
+            fecha: String(fecha),
             estado: "PROCESADO",
-            items: JSON.stringify(lineasFactura), 
-            iva: rawIva,
+            items: String(lineasFactura.length), 
+            iva: String(rawIva),
             descuento: "0",
-            total: rawTotal,
-            documento_origen: rutaDocumentoStorage
+            total: String(rawTotal),
+            documento_origen: String(rutaDocumentoStorage || '')
         }]).select();
-
+        
     if (facErr) { 
         console.error("Error al insertar en la base de datos: ", facErr);
         showToast("Error al guardar en la tabla facturas_compra.", true); 
+        if (btnConf) { btnConf.disabled = false; btnConf.innerHTML = textoOriginalBtn; }
         return; 
     }
 
     for (const item of lineasFactura) {
-        if (item.id_producto) {
-            const { data: pReal } = await supabaseClient.from('productos').select('stock').eq('row_id', item.id_producto).single();
-            const stockActualNum = pReal && pReal.stock ? parseInt(pReal.stock) || 0 : 0;
-            
-            const nuevoStock = stockActualNum + (parseInt(item.cantidad) || 1);
+        // Guardado de la transacción histórica en productos_compras
+        await supabaseClient
+            .from('productos_compras')
+            .insert([{
+                id_factura: String(llaveIdUnica),
+                estado: "PROCESADO",
+                fecha: String(fecha),
+                codigo: String(item.codigo_interno || ''),
+                descripcion: String(item.descripcion || item.descripcion_original || ''),
+                precio_compra: String(item.costo),
+                cantidad: String(item.cantidad || 1),
+                proveedor: String(proveedor),
+                codigo_proveedor: String(idFacturaOriginal), 
+                documento_origen: String(rutaDocumentoStorage || '')
+            }]);
 
-            await supabaseClient
+        // ACTUALIZACIÓN EN CASCADA DEL MAESTRO DE PRODUCTOS
+        if (item.id_producto) {
+            let skuLimpio = item.codigo_proveedor || '';
+            
+            if (!skuLimpio && item.descripcion_original) {
+                const matchSku = item.descripcion_original.match(/\[PROV:\s*([^\]]+)\]/i);
+                if (matchSku) {
+                    skuLimpio = matchSku[1].trim();
+                }
+            }
+
+            const { error: errMaestro } = await supabaseClient
                 .from('productos')
                 .update({
-                    precio_compra: String(item.costo),       
-                    precio_venta: String(Math.round(item.precio_final)), 
-                    stock: String(nuevoStock)                                       
+                    precio_compra: item.costo,                     
+                    fecha_precio: fecha,                    
+                    proveedor: proveedor,                  
+                    codigo_prov: String(skuLimpio),        
+                    precio_venta: Math.round(parseFloat(item.precio_final) || 0)
                 })
                 .eq('row_id', item.id_producto);
-        }
-    }
 
-    showToast("Guardado local listo. Sincronizando con Siigo...");
-
-    try {
-        const nitIdentificacion = idFacturaOriginal.replace(/[^0-9]/g, "") || "800123456"; 
-
-        const payloadSiigo = {
-            proveedor_nit: nitIdentificacion,
-            id_factura_proveedor: idFacturaOriginal,
-            fecha_emision: fecha, // YYYY-MM-DD nativo del input HTML
-            total_neto: parseFloat(rawTotal) || 0,
-            items_factura: lineasFactura.map(linea => ({
-                codigo_interno: linea.codigo_interno,
-                descripcion: linea.descripcion || linea.descripcion_original,
-                cantidad: parseInt(linea.cantidad) || 1,
-                costo: parseFloat(linea.costo) || 0,
-                precio_final: parseFloat(linea.precio_final) || 0
-            }))
-        };
-
-        const siigoCall = await fetch("https://vdlxmajvzdtbewchyowm.supabase.co/functions/v1/siigo-crear-factura-compra", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${supabaseClient.supabaseKey || ''}`
-            },
-            body: JSON.stringify(payloadSiigo)
-        });
-
-        const siigoResult = await siigoCall.json();
-
-        if (siigoResult.success) {
-            showToast(`¡Factura guardada y subida a Siigo con éxito! Consecutivo: ${siigoResult.name}`);
-        } else {
-            console.error("Siigo no pudo procesar el documento:", siigoResult.error);
-            showToast("Guardado local OK, pero Siigo rechazó la factura. Revisa la consola.", true);
+            if (errMaestro) {
+                console.error(`Error actualizando maestro del producto ${item.codigo_interno}:`, errMaestro);
+            }
         }
 
-    } catch (siigoErr) {
-        console.error("Error crítico de red en Edge Function Siigo:", siigoErr);
-        showToast("Error de conexión con la Edge Function de Siigo.", true);
     }
 
-// Bloquear ambos elementos tras concluir exitosamente el flujo
-    const btnConf = document.getElementById('btnConfirmar');
+    // NUEVA CONEXIÓN INTEGRAL CON EDGE FUNCTION SIIGO
+    if (window.configAvanzadaSiigo && window.configAvanzadaSiigo.sincronizarSiigo) {
+        showToast("Guardado local listo. Sincronizando con Siigo...");
+
+try {
+            // Usar el NIT extraído por la IA si existe, sino fallback al proveedor actual
+            const nitIdentificacion = window.nitProveedorExtraido || proveedor.replace(/[^0-9]/g, "");
+
+const pagosActivos = window.configAvanzadaSiigo.pagos.filter(p => p.activo && p.monto > 0);
+            
+            const payloadSiigo = {
+                proveedor_nit: nitIdentificacion || "800123456",
+                id_factura_proveedor: window.idFacturaCompletaSiigo ? String(window.idFacturaCompletaSiigo).trim() : (idFacturaOriginal ? String(idFacturaOriginal).trim() : "1"),
+                fecha_emision: fecha,
+                total_neto: parseFloat(rawTotal) || 0,
+                pagos_multiplo: pagosActivos.length > 0 ? pagosActivos : [{ metodo: "credito-proveedores", monto: parseFloat(rawTotal) || 0 }],
+                observaciones_adicionales: window.configAvanzadaSiigo.observaciones || '',
+                actualizar_precios_maestros: window.configAvanzadaSiigo.actualizarPreciosSiigo || false,
+                items_factura: lineasFactura.map(linea => ({
+                    codigo_interno: linea.codigo_interno,
+                    descripcion: linea.descripcion || linea.descripcion_original,
+                    cantidad: parseInt(linea.cantidad) || 1,
+                    costo: parseFloat(linea.precio_unitario_sin_iva) || parseFloat(linea.costo) || 0,
+                    precio_final: parseFloat(linea.precio_final) || 0,
+                    precio_anterior: parseFloat(linea.precio_actual) || 0
+                }))
+            };
+
+            const siigoCall = await fetch("https://vdlxmajvzdtbewchyowm.supabase.co/functions/v1/siigo-crear-factura-compra", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${supabaseClient.supabaseKey || ''}`
+                },
+                body: JSON.stringify(payloadSiigo)
+            });
+
+            const siigoResult = await siigoCall.json();
+
+            if (siigoResult.success) {
+                showToast(`¡Factura guardada y subida a Siigo con éxito! Documento: ${siigoResult.name}`);
+            } else {
+                console.error("Siigo no pudo procesar el documento:", siigoResult.error);
+                showToast("Guardado local OK, pero Siigo rechazó la factura. Verifica logs.", true);
+            }
+
+        } catch (siigoErr) {
+            console.error("Error crítico de red en Edge Function Siigo:", siigoErr);
+            showToast("Error de conexión con la Edge Function de Siigo.", true);
+        }
+    } else {
+        showToast("Factura procesada localmente con éxito en ThermoAir.");
+    }
+
     if (btnConf) btnConf.disabled = true;
     const btnAvan = document.getElementById('btnMenuAvanzado');
     if (btnAvan) btnAvan.disabled = true;
@@ -995,16 +1134,15 @@ function cerrarHojaSheet() { const overlaySheet = document.getElementById('overl
 function formatoMoneda(valor) { return "$" + Math.round(valor).toLocaleString('es-CO'); }
 function showToast(m, d=false) { const t=document.getElementById('toast'); if(!t)return; t.textContent=m; t.style.background=d?"#dc2626":"#1e293b"; t.classList.add('visible'); setTimeout(() => t.classList.remove('visible'), 3000); }
 
-// =========================================================================
 // 4B. GESTIÓN DEL MENÚ AVANZADO DE CONFIGURACIÓN (SIIGO UI)
-// =========================================================================
 
 function abrirMenuAvanzadoSiigo() {
-    // Si ya existe una modal abierta, la removemos para evitar duplicados
     const modalExistente = document.getElementById('modalSiigoAvanzado');
     if (modalExistente) modalExistente.remove();
 
-    // Crear el contenedor de la capa oscura overlay
+    window.configAvanzadaSiigo.actualizarPreciosSiigo = true;
+    window.configAvanzadaSiigo.tipoComprobante = "FC-1";
+
     const overlay = document.createElement('div');
     overlay.id = 'modalSiigoAvanzado';
     overlay.style = `
@@ -1013,9 +1151,10 @@ function abrirMenuAvanzadoSiigo() {
         padding: 20px; font-family: inherit;
     `;
 
-    // Estructura interna de la ventana modal avanzada
-    overlay.innerHTML = `
-        <div style="background: white; width: 100%; max-width: 500px; border-radius: 14px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); overflow: hidden; display: flex; flex-direction: column;">
+    const totalFactura = parseInt(document.getElementById('resumenTotal').textContent.replace(/[^0-9]/g, "")) || 0;
+
+overlay.innerHTML = `
+        <div style="background: white; width: 100%; max-width: 550px; border-radius: 14px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); overflow: hidden; display: flex; flex-direction: column;">
             
             <div style="background: #284B87; padding: 16px 20px; color: white; display: flex; justify-content: space-between; align-items: center;">
                 <h3 style="margin: 0; font-size: 16px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">Configuración de Enrutamiento</h3>
@@ -1032,37 +1171,35 @@ function abrirMenuAvanzadoSiigo() {
                     <input type="checkbox" id="swSiigo" ${configAvanzadaSiigo.sincronizarSiigo ? 'checked' : ''} style="width: 40px; height: 20px; cursor: pointer;">
                 </div>
 
-                <div style="display: flex; align-items: center; justify-content: space-between; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
-                    <div>
-                        <label style="font-size: 13px; font-weight: bold; color: #203764; display: block;">Actualizar Precios en Siigo</label>
-                        <span style="font-size: 11px; color: #64748b;">Modificar listas de precios de venta</span>
-                    </div>
-                    <input type="checkbox" id="swPrecios" ${configAvanzadaSiigo.actualizarPreciosSiigo ? 'checked' : ''} style="width: 40px; height: 20px; cursor: pointer;">
-                </div>
-
                 <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 4px 0;">
 
-                <div class="campo">
-                    <label style="font-size: 11px; font-weight: bold; color: #203764; margin-bottom: 4px; text-transform: uppercase;">Tipo de Comprobante (Siigo)</label>
-                    <select id="selComprobante" style="width: 100%; padding: 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 14px; outline: none; background: white;">
-                        <option value="FC-1" ${configAvanzadaSiigo.tipoComprobante === 'FC-1' ? 'selected' : ''}>[FC-1] Factura de Compra General</option>
-                        <option value="FC-2" ${configAvanzadaSiigo.tipoComprobante === 'FC-2' ? 'selected' : ''}>[FC-2] Compra Proveedor Exterior</option>
-                        <option value="Gastos" ${configAvanzadaSiigo.tipoComprobante === 'Gastos' ? 'selected' : ''}>[G-1] Comprobante de Gasto Directo</option>
-                    </select>
+                <div style="font-size: 12px; font-weight: bold; color: #475569; text-transform: uppercase; letter-spacing: 0.4px;">Métodos de Pago (Máx. 2)</div>
+                
+<div id="contenedorPagos" style="display: flex; flex-direction: column; gap: 12px;">
+                    ${configAvanzadaSiigo.pagos.map((pago, idx) => `
+                        <div style="display: grid; grid-template-columns: 1fr 120px; gap: 8px; align-items: end;">
+                            <select id="selPago${idx}" onchange="actualizarNombrePago(${idx}, this.value)" style="padding: 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 14px; outline: none; background: white;">
+                                <option value="credito-proveedores" ${pago.metodo === 'credito-proveedores' ? 'selected' : ''}>Crédito Proveedores</option>
+                                <option value="efectivo" ${pago.metodo === 'efectivo' ? 'selected' : ''}>Efectivo</option>
+                                <option value="bancolombia" ${pago.metodo === 'bancolombia' ? 'selected' : ''}>Bancolombia</option>
+                                <option value="bbva" ${pago.metodo === 'bbva' ? 'selected' : ''}>BBVA</option>
+                            </select>
+                            <input type="text" id="montoPago${idx}" value="${maskPrecio(pago.monto)}" oninput="actualizarMontoPago(${idx}, this)" style="padding: 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 14px; outline: none; text-align: right;" placeholder="$0">
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" id="chkPago${idx}" ${pago.activo ? 'checked' : ''} onchange="alternarPago(${idx})">
+                                <span style="font-size: 11px; color: #475569;">Activo</span>
+                            </label>
+                        </div>
+                    `).join('')}
                 </div>
-
-                <div class="campo">
-                    <label style="font-size: 11px; font-weight: bold; color: #203764; margin-bottom: 4px; text-transform: uppercase;">Forma de Pago Contable</label>
-                    <select id="selPago" style="width: 100%; padding: 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 14px; outline: none; background: white;">
-                        <option value="credito-30" ${configAvanzadaSiigo.formaPago === 'credito-30' ? 'selected' : ''}>Crédito Proveedores (30 Días)</option>
-                        <option value="contado-caja" ${configAvanzadaSiigo.formaPago === 'contado-caja' ? 'selected' : ''}>Efectivo / Caja General (Contado)</option>
-                        <option value="transferencia" ${configAvanzadaSiigo.formaPago === 'transferencia' ? 'selected' : ''}>Transferencia Bancaria / Bancolombia</option>
-                    </select>
+                
+                <div style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 10px; font-size: 12px; color: #92400e;">
+                    <strong>Total Factura:</strong> ${maskPrecio(totalFactura)} | <strong id="sumaPagosDisplay">Pagos: $0</strong>
                 </div>
 
                 <div class="campo">
                     <label style="font-size: 11px; font-weight: bold; color: #203764; margin-bottom: 4px; text-transform: uppercase;">Observaciones / Notas de la Factura</label>
-                    <textarea id="txtObservacionesAvanzadas" rows="3" style="width: 100%; padding: 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 14px; outline: none; font-family: inherit; resize: none;" placeholder="Estas notas viajarán al documento contable en Siigo...">${configAvanzadaSiigo.observaciones}</textarea>
+                    <textarea id="txtObservacionesAvanzadas" rows="3" style="width: 100%; padding: 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 14px; outline: none; font-family: inherit; resize: none;" placeholder="Estas notas viajarán al documento contable en Siigo...">${configAvanzadaSiigo.observaciones || ''}</textarea>
                 </div>
             </div>
 
@@ -1075,21 +1212,95 @@ function abrirMenuAvanzadoSiigo() {
 
     document.body.appendChild(overlay);
 
-    // Lógica reactiva interna: Deshabilitar campos si el switch principal de Siigo está OFF
     const swSiigo = document.getElementById('swSiigo');
-    const camposMapeables = [document.getElementById('swPrecios'), document.getElementById('selComprobante'), document.getElementById('selPago'), document.getElementById('txtObservacionesAvanzadas')];
     
     const verificarEstadoCampos = () => {
-        camposMapeables.forEach(campo => {
-            if (campo) {
-                campo.disabled = !swSiigo.checked;
-                campo.style.opacity = swSiigo.checked ? "1" : "0.5";
+        for (let i = 0; i < 2; i++) {
+            const sel = document.getElementById(`selPago${i}`);
+            const inp = document.getElementById(`montoPago${i}`);
+            const chk = document.getElementById(`chkPago${i}`);
+            if (sel && inp && chk) {
+                sel.disabled = !swSiigo.checked;
+                inp.disabled = !swSiigo.checked;
+                chk.disabled = !swSiigo.checked;
+                sel.style.opacity = swSiigo.checked ? "1" : "0.5";
+                inp.style.opacity = swSiigo.checked ? "1" : "0.5";
             }
-        });
+        }
+        const obs = document.getElementById('txtObservacionesAvanzadas');
+        if (obs) {
+            obs.disabled = !swSiigo.checked;
+            obs.style.opacity = swSiigo.checked ? "1" : "0.5";
+        }
     };
 
-    swSiigo.addEventListener('change', verificarEstadoCampos);
-    verificarEstadoCampos(); // Ejecución inicial
+swSiigo.addEventListener('change', () => {
+        window.configAvanzadaSiigo.sincronizarSiigo = swSiigo.checked;
+        verificarEstadoCampos();
+    });
+    
+    // Calcular suma de pagos al abrir
+    actualizarSumaPagos();
+    verificarEstadoCampos();
+}
+
+// Funciones auxiliares para el modal de multipago
+function alternarPago(idx) {
+    const chk = document.getElementById(`chkPago${idx}`);
+    if (chk) window.configAvanzadaSiigo.pagos[idx].activo = chk.checked;
+    actualizarSumaPagos();
+}
+
+function actualizarNombrePago(idx, valor) {
+    window.configAvanzadaSiigo.pagos[idx].metodo = valor;
+}
+
+function actualizarMontoPago(idx, elemento) {
+    let cursorPosition = elemento.selectionStart;
+    let oldLength = elemento.value.length;
+    let valorNumerico = 0;
+    
+    let limpia = elemento.value.replace(/[^0-9]/g, "");
+    if (limpia === "") {
+        elemento.value = "$0";
+        elemento.setSelectionRange(2, 2);
+        valorNumerico = 0;
+    } else {
+        valorNumerico = parseInt(limpia, 10) || 0;
+        
+        // 1. Obtener el total de la factura desde el DOM
+        const totalFactura = parseInt(document.getElementById('resumenTotal')?.textContent?.replace(/[^0-9]/g, "")) || 0;
+        
+        // 2. Calcular cuánto han sumado los DEMÁS campos de pago (excluyendo el actual)
+        let sumaOtrosPagos = 0;
+        for (let i = 0; i < 2; i++) {
+            if (i !== idx) {
+                sumaOtrosPagos += window.configAvanzadaSiigo.pagos[i].monto || 0;
+            }
+        }
+        
+        // 3. Si el nuevo número sobrepasa el límite disponible, frenar el exceso
+        const maximoDisponible = totalFactura - sumaOtrosPagos;
+        if (valorNumerico > maximoDisponible) {
+            valorNumerico = maximoDisponible;
+        }
+
+        elemento.value = maskPrecio(valorNumerico);
+        let newLength = elemento.value.length;
+        elemento.setSelectionRange(cursorPosition + (newLength - oldLength), cursorPosition + (newLength - oldLength));
+    }
+    
+    window.configAvanzadaSiigo.pagos[idx].monto = valorNumerico;
+    actualizarSumaPagos();
+}
+
+function actualizarSumaPagos() {
+    let sumaPagos = 0;
+    for (let i = 0; i < 2; i++) {
+        sumaPagos += window.configAvanzadaSiigo.pagos[i].monto || 0;
+    }
+    const display = document.getElementById('sumaPagosDisplay');
+    if (display) display.textContent = `Pagos: ${maskPrecio(sumaPagos)}`;
 }
 
 function cerrarMenuAvanzadoSiigo() {
@@ -1098,14 +1309,22 @@ function cerrarMenuAvanzadoSiigo() {
 }
 
 function guardarConfigAvanzadaSiigo() {
-    // Extraer los valores modificados del DOM de la modal y persistirlos en el estado global
-    configAvanzadaSiigo.sincronizarSiigo = document.getElementById('swSiigo').checked;
-    configAvanzadaSiigo.actualizarPreciosSiigo = document.getElementById('swPrecios').checked;
-    configAvanzadaSiigo.tipoComprobante = document.getElementById('selComprobante').value;
-    configAvanzadaSiigo.formaPago = document.getElementById('selPago').value;
-    configAvanzadaSiigo.observaciones = document.getElementById('txtObservacionesAvanzadas').value.trim();
+    configAvanzadaSiigo.sincronizarSiigo = document.getElementById('swSiigo')?.checked || false;
+    configAvanzadaSiigo.observaciones = document.getElementById('txtObservacionesAvanzadas')?.value?.trim() || "";
 
-    // Feedback visual al usuario
+    // Guardar configuración de pagos desde el modal
+    for (let i = 0; i < 2; i++) {
+        const selPago = document.getElementById(`selPago${i}`);
+        const montoPago = document.getElementById(`montoPago${i}`);
+        const chkPago = document.getElementById(`chkPago${i}`);
+        
+        if (selPago && montoPago && chkPago) {
+            window.configAvanzadaSiigo.pagos[i].metodo = selPago.value;
+            window.configAvanzadaSiigo.pagos[i].monto = limpiarValorMonedaAFloat(montoPago.value);
+            window.configAvanzadaSiigo.pagos[i].activo = chkPago.checked;
+        }
+    }
+
     if (typeof showToast === "function") {
         showToast("Configuración de enrutamiento aplicada correctamente.");
     } else {
@@ -1113,4 +1332,85 @@ function guardarConfigAvanzadaSiigo() {
     }
     
     cerrarMenuAvanzadoSiigo();
+}
+
+// NÚCLEO FINANCIERO DE PRICING DINÁMICO (THERMOAIR BASE)
+
+function ejecutarAlgoritmoFinanciero(costoNuevo, costoAnterior, precioActual) {
+    let sugerido = calcularPrecioSugerido(costoNuevo);
+    
+    let final = (precioActual > 0) ? precioActual : sugerido; 
+    
+    if (precioActual >= sugerido) {
+        sugerido = precioActual;
+    }
+    
+    let margen = 0;
+    if (costoNuevo > 0) {
+        margen = ((final * 0.9) / costoNuevo) - 1;
+    }
+
+    return { sugerido: sugerido, final: final, margen: margen };
+}
+
+function calcularPrecioSugerido(costo) {
+    let multiplicador = obtenerMultiplicador(costo);
+    return redondearPrecio(costo * multiplicador);
+}
+
+function obtenerMultiplicador(precioCompra) {
+    if (precioCompra <= 0) return 1.445;
+
+    const costos = [
+        1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000,
+        11000, 12000, 13000, 14000, 15000, 16000, 17000, 18000, 19000, 20000,
+        25000, 30000, 35000, 40000, 45000, 50000, 55000, 60000, 65000, 70000,
+        75000, 80000, 85000, 90000, 95000, 100000, 125000, 150000, 175000, 200000,
+        225000, 250000, 275000, 300000, 325000, 350000, 375000, 400000, 425000, 450000,
+        475000, 500000, 525000, 550000, 575000, 600000, 625000, 650000, 675000, 700000,
+        725000, 750000, 775000, 800000, 825000, 850000, 875000, 900000, 925000, 950000,
+        975000, 1000000, 1250000, 1500000, 1750000, 2000000, 2250000, 2500000, 2750000, 3000000,
+        3250000, 3500000, 3750000, 4000000, 4250000, 4500000, 4750000, 5000000, 6000000, 7000000,
+        8000000, 9000000, 10000000, 11000000, 12000000, 13000000, 14000000, 15000000, 16000000, 17000000,
+        18000000, 19000000, 20000000
+    ];
+
+    const multip = [
+        2.5, 2.35, 2.25, 2.15, 2.05, 1.98, 1.92, 1.87, 1.83, 1.78,
+        1.74, 1.7, 1.67, 1.64, 1.6, 1.58, 1.56, 1.54, 1.52, 1.5,
+        1.495, 1.49, 1.485, 1.48, 1.475, 1.47, 1.468, 1.466, 1.464, 1.462,
+        1.46, 1.458, 1.456, 1.454, 1.452, 1.45, 1.445, 1.44, 1.435, 1.43,
+        1.427, 1.424, 1.421, 1.418, 1.415, 1.412, 1.409, 1.406, 1.403, 1.4,
+        1.397, 1.394, 1.391, 1.388, 1.385, 1.382, 1.379, 1.376, 1.373, 1.37,
+        1.367, 1.364, 1.361, 1.358, 1.355, 1.352, 1.349, 1.346, 1.343, 1.34,
+        1.337, 1.334, 1.324, 1.314, 1.304, 1.294, 1.286, 1.279, 1.272, 1.264,
+        1.257, 1.249, 1.242, 1.234, 1.229, 1.224, 1.219, 1.214, 1.206, 1.198,
+        1.19, 1.186, 1.182, 1.178, 1.174, 1.17, 1.166, 1.162, 1.158, 1.154,
+        1.15, 1.146, 1.142
+    ];
+
+    if (precioCompra <= costos[0]) return multip[0];
+
+    for (let i = 0; i < costos.length - 1; i++) {
+        if (precioCompra >= costos[i] && precioCompra <= costos[i + 1]) {
+            return interpolar(costos[i], costos[i + 1], multip[i], multip[i + 1], precioCompra);
+        }
+    }
+
+    return multip[multip.length - 1];
+}
+
+function interpolar(x1, x2, y1, y2, x) {
+    if (x2 === x1) return y1;
+    return y1 + ((x - x1) * (y2 - y1)) / (x2 - x1);
+}
+
+function redondearPrecio(precio) {
+    let salto = 100000;
+    if (precio < 10000) salto = 500;
+    else if (precio < 100000) salto = 1000;
+    else if (precio < 1000000) salto = 10000;
+
+    // Emulación nativa exacta de WorksheetFunction.Ceiling (Redondeo hacia arriba al múltiplo más cercano)
+    return Math.ceil(precio / salto) * salto;
 }

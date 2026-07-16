@@ -1,4 +1,4 @@
-const SUPABASE_URL = "https://vdlxmajvzdtbewchyowm.supabase.co"; // Se quitó /rest/v1/ de aquí
+const SUPABASE_URL = "https://vdlxmajvzdtbewchyowm.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkbHhtYWp2emR0YmV3Y2h5b3dtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyMTQwNzAsImV4cCI6MjA5Nzc5MDA3MH0.Lkd6dAfeItdxPS-rEiruHDB36-1GDE6I_0ogR7TuhFM";
 
 document.getElementById("formLogin").addEventListener("submit", async function (e) {
@@ -37,7 +37,7 @@ document.getElementById("formLogin").addEventListener("submit", async function (
             sessionStorage.setItem("session_area", cuentaValida.area);
             sessionStorage.setItem("session_time", Date.now().toString());
 
-            window.location.href = `index_${cuentaValida.area}.html`;
+            window.location.href = "index_gestion.html";
             
         } else {
             divError.innerText = "Usuario o contraseña incorrectos";
