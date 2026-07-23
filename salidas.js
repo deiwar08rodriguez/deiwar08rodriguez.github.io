@@ -1,6 +1,4 @@
-// ══════════════════════════════════════════════════════════
 //  CONFIGURACIÓN SUPABASE ← ACTUALIZA AQUÍ CON TUS CREDENCIALES
-// ══════════════════════════════════════════════════════════
 const SUPABASE_URL  = 'https://vdlxmajvzdtbewchyowm.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkbHhtYWp2emR0YmV3Y2h5b3dtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyMTQwNzAsImV4cCI6MjA5Nzc5MDA3MH0.Lkd6dAfeItdxPS-rEiruHDB36-1GDE6I_0ogR7TuhFM';
 
@@ -19,13 +17,7 @@ let salidaEnContexto = null; // objeto salida para el menú contextual
 // Dropdown producto seleccionado
 let productoSeleccionado = null;
 
-// Long-press
-let pressTimer = null;
-const LONG_PRESS_MS = 600;
-
-// ══════════════════════════════════════════════════════════
 //  INIT
-// ══════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async () => {
     await Promise.all([cargarProductos(), cargarBuses()]);
     await cargarSalidas();
@@ -33,9 +25,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindUI();
 });
 
-// ══════════════════════════════════════════════════════════
 //  CARGA DE DATOS
-// ══════════════════════════════════════════════════════════
 async function cargarProductos() {
     const { data, error } = await sb.from('productos').select('row_id, codigo, descripcion, stock');
     if (error) { 
@@ -81,9 +71,7 @@ async function cargarSalidas() {
     todasSalidas = data || [];
 }
 
-// ══════════════════════════════════════════════════════════
 //  RENDERIZADO
-// ══════════════════════════════════════════════════════════
 function renderizarTodo(filtro = '') {
     const txt = filtro.trim().toLowerCase();
 
@@ -185,6 +173,7 @@ function renderPC(grupos) {
         filas.forEach(s => {
             const tr = document.createElement('tr');
             tr.dataset.id = s.id;
+            tr.style.cursor = 'pointer'; // Feedback visual
             tr.innerHTML = `
                 <td class="col-codigo">${s.codigo || ''}</td>
                 <td class="col-desc">${descripcionDeCodigo(s.codigo)}</td>
@@ -194,10 +183,8 @@ function renderPC(grupos) {
                 <td class="col-tipo ${s.tipo === 'T' ? 'tipo-T' : 'tipo-V'}">${s.tipo === 'T' ? '🚌 Bus' : '🧾 Venta'}</td>
                 <td>${nombreBus(s.bus)}</td>`;
 
-            // Long press en PC (click derecho simulado con hold)
-            tr.addEventListener('mousedown', e => iniciarLongPress(e, s));
-            tr.addEventListener('mouseup',   cancelarLongPress);
-            tr.addEventListener('mouseleave',cancelarLongPress);
+            // Abrir menú directamente con un clic
+            tr.addEventListener('click', e => abrirMenuContextual(e, s));
             tbody.appendChild(tr);
         });
     });
@@ -242,12 +229,8 @@ function renderMobile(grupos) {
                     </div>
                 </div>`;
 
-            // Long press móvil
-            card.addEventListener('touchstart',  e => iniciarLongPress(e, s), { passive: true });
-            card.addEventListener('touchend',    cancelarLongPress);
-            card.addEventListener('touchcancel', cancelarLongPress);
-            card.addEventListener('mousedown', e => iniciarLongPress(e, s));
-            card.addEventListener('mouseup',   cancelarLongPress);
+            // Abrir menú directamente al tocar/hacer clic
+            card.addEventListener('click', e => abrirMenuContextual(e, s));
 
             grupo.appendChild(card);
         });
@@ -288,40 +271,51 @@ function bindUI() {
     });
 }
 
-// ══════════════════════════════════════════════════════════
 //  SHEET: ABRIR / CERRAR
-// ══════════════════════════════════════════════════════════
 function abrirSheet(salidaEditar = null) {
     itemsPendientes = [];
     productoSeleccionado = null;
+    salidaEdicionOriginal = salidaEditar;
+
+    // Limpieza inicial de inputs
     document.getElementById('inputProducto').value = '';
     document.getElementById('inputCantidad').value = '1';
     document.getElementById('inputRecibe').value = '';
     document.getElementById('selBus').value = '';
     document.getElementById('dropdownProductos').style.display = 'none';
-    renderMiniTabla();
 
     if (salidaEditar) {
-        // Modo edición: pre-cargar datos
+        // Modo edición: Pre-cargar ÚNICAMENTE los controles superiores
         document.getElementById('sheetTitulo').textContent = 'Editar Salida';
         setModo(salidaEditar.tipo || 'V');
         document.getElementById('inputRecibe').value = salidaEditar.recibe || '';
         if (salidaEditar.bus) document.getElementById('selBus').value = salidaEditar.bus;
 
-        // Pre-cargar el item en la mini tabla
-        itemsPendientes = [{
-            codigo: salidaEditar.codigo,
-            descripcion: descripcionDeCodigo(salidaEditar.codigo),
-            cantidad: parseFloat(salidaEditar.cantidad) || 0,
-            _editId: salidaEditar.id,
-            _cantidadOriginal: parseFloat(salidaEditar.cantidad) || 0,
-            _codigoOriginal: salidaEditar.codigo,
-        }];
-        renderMiniTabla();
+        // 1. Vincular el producto seleccionado en el input superior
+        const cant = parseFloat(salidaEditar.cantidad) || 1;
+        const prod = todosProductos.find(p => p.codigo === salidaEditar.codigo);
+        
+        if (prod) {
+            productoSeleccionado = prod;
+            document.getElementById('inputProducto').value = `${prod.codigo} - ${prod.descripcion}`;
+        } else {
+            document.getElementById('inputProducto').value = `${salidaEditar.codigo} - ${descripcionDeCodigo(salidaEditar.codigo)}`;
+        }
+
+        // 2. Cargar la cantidad original en el input superior
+        document.getElementById('inputCantidad').value = cant;
+
+        // NOTA: La mini tabla (itemsPendientes) se deja vacía intencionalmente.
+        // El usuario ajustará arriba y presionará "＋ Agregar Producto".
+
     } else {
+        // Modo nueva salida
         document.getElementById('sheetTitulo').textContent = 'Nueva Salida';
         setModo('V');
     }
+
+    // Renderiza la mini tabla vacía lista para recibir lo que el usuario agregue
+    renderMiniTabla();
 
     document.getElementById('overlaySheet').classList.add('visible');
     setTimeout(() => document.getElementById('hojaSheet').classList.add('visible'), 10);
@@ -331,12 +325,14 @@ function cerrarSheet() {
     document.getElementById('hojaSheet').classList.remove('visible');
     document.getElementById('overlaySheet').classList.remove('visible');
     document.getElementById('dropdownProductos').style.display = 'none';
+    
+    // Limpiamos los estados de edición y pendientes
     itemsPendientes = [];
+    productoSeleccionado = null;
+    salidaEdicionOriginal = null;
 }
 
-// ══════════════════════════════════════════════════════════
 //  MODO V / T
-// ══════════════════════════════════════════════════════════
 function setModo(modo) {
     modoActual = modo;
     document.getElementById('btnModoVenta').classList.toggle('activo', modo === 'V');
@@ -345,9 +341,7 @@ function setModo(modo) {
     document.getElementById('labelRecibe').textContent = modo === 'T' ? 'Recibe (técnico)' : 'Cliente';
 }
 
-// ══════════════════════════════════════════════════════════
 //  DROPDOWN PRODUCTOS
-// ══════════════════════════════════════════════════════════
 function buscarProductoDropdown(texto) {
     productoSeleccionado = null;
     const drop = document.getElementById('dropdownProductos');
@@ -370,21 +364,32 @@ function buscarProductoDropdown(texto) {
         div.className = 'dropdown-item';
         div.innerHTML = `<strong style="color:#284B87">${p.codigo}</strong> <span style="color:#64748b;">— ${p.descripcion}</span>`;
 
-        const seleccionar = () => {
+        const seleccionar = (e) => {
+            // Evitar que el clic continúe hacia los elementos que están debajo
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
             productoSeleccionado = p;
             document.getElementById('inputProducto').value = `${p.codigo} — ${p.descripcion}`;
             drop.style.display = 'none';
         };
 
+        // Usar e.preventDefault() en mousedown evita que el foco o el clic traspasen
         div.addEventListener('mousedown', seleccionar);
-        div.addEventListener('touchstart', seleccionar, { passive: true });
+        div.addEventListener('touchstart', seleccionar, { passive: false });
         drop.appendChild(div);
     });
 }
 
 // ══════════════════════════════════════════════════════════
-//  MINI TABLA: AGREGAR / RENDER / QUITAR
+//  ESTADO Y MINI TABLA: AGREGAR / EDITAR / QUITAR / RENDER
 // ══════════════════════════════════════════════════════════
+
+// Variable para saber si estamos editando una fila existente (null si es nuevo)
+let editIndex = null; 
+
 function agregarItemPendiente() {
     if (!productoSeleccionado) {
         mostrarToast('Selecciona un producto válido del listado', 'err');
@@ -397,28 +402,76 @@ function agregarItemPendiente() {
         return;
     }
 
-    // Verificar si ya está en la lista → sumar cantidad
-    const existente = itemsPendientes.find(i => i.codigo === productoSeleccionado.codigo && !i._editId);
-    if (existente) {
-        existente.cantidad += cantInput;
-    } else {
-        itemsPendientes.push({
+    if (editIndex !== null) {
+        // Modo Edición: Actualizar la fila seleccionada
+        itemsPendientes[editIndex] = {
             codigo:      productoSeleccionado.codigo,
             descripcion: productoSeleccionado.descripcion,
-            cantidad:    cantInput,
-        });
+            cantidad:    cantInput
+        };
+        editIndex = null; // Limpiar modo edición
+    } else {
+        // Modo Creación: Verificar si ya existe en la lista para sumar o agregar
+        const existente = itemsPendientes.find(i => i.codigo === productoSeleccionado.codigo);
+        if (existente) {
+            existente.cantidad += cantInput;
+        } else {
+            itemsPendientes.push({
+                codigo:      productoSeleccionado.codigo,
+                descripcion: productoSeleccionado.descripcion,
+                cantidad:    cantInput,
+            });
+        }
     }
 
-    productoSeleccionado = null;
-    document.getElementById('inputProducto').value = '';
-    document.getElementById('inputCantidad').value = '1';
-    document.getElementById('dropdownProductos').style.display = 'none';
+    resetearInputs();
     renderMiniTabla();
 }
 
-function quitarItemPendiente(idx) {
+function cargarItemParaEditar(idx) {
+    const item = itemsPendientes[idx];
+    if (!item) return;
+
+    // Asignar productoSeleccionado para que el botón de agregar/guardar lo reconozca
+    productoSeleccionado = {
+        codigo: item.codigo,
+        descripcion: item.descripcion
+    };
+
+    // Llenar los inputs del formulario
+    document.getElementById('inputProducto').value = `${item.codigo} - ${item.descripcion}`;
+    document.getElementById('inputCantidad').value = item.cantidad;
+
+    // Guardar el índice que estamos editando
+    editIndex = idx;
+}
+
+function quitarItemPendiente(idx, event) {
+    // Detener la propagación para que el clic en '✕' no active la edición de la fila
+    if (event) event.stopPropagation();
+
     itemsPendientes.splice(idx, 1);
+
+    // Si estábamos editando la fila que se eliminó, cancelamos la edición
+    if (editIndex === idx) {
+        editIndex = null;
+        resetearInputs();
+    } else if (editIndex > idx) {
+        // Ajustar el índice de edición si se borró un ítem previo
+        editIndex--;
+    }
+
     renderMiniTabla();
+}
+
+function resetearInputs() {
+    productoSeleccionado = null;
+    editIndex = null;
+    document.getElementById('inputProducto').value = '';
+    document.getElementById('inputCantidad').value = '1';
+    
+    const dropdown = document.getElementById('dropdownProductos');
+    if (dropdown) dropdown.style.display = 'none';
 }
 
 function renderMiniTabla() {
@@ -427,21 +480,35 @@ function renderMiniTabla() {
         tbody.innerHTML = `<tr><td colspan="4" class="mini-tabla-vacia" style="text-align:center;color:#94a3b8;padding:15px;">Aún no hay items. Agrega productos arriba.</td></tr>`;
         return;
     }
+
     tbody.innerHTML = '';
     itemsPendientes.forEach((item, idx) => {
         const tr = document.createElement('tr');
+        
+        // Estilo opcional para destacar visualmente el renglón si se está editando
+        if (idx === editIndex) {
+            tr.style.backgroundColor = '#f1f5f9';
+        }
+        tr.style.cursor = 'pointer';
+
+        // Al presionar en la fila cargamos los datos para edición
+        tr.onclick = () => cargarItemParaEditar(idx);
+
         tr.innerHTML = `
             <td class="mt-codigo">${item.codigo}</td>
             <td class="mt-desc">${item.descripcion}</td>
             <td class="mt-cant">${formatCant(item.cantidad)}</td>
-            <td class="mt-del"><button class="btn-mini-del" onclick="quitarItemPendiente(${idx})" style="background:none;border:none;cursor:pointer;color:#dc2626;font-weight:bold;">✕</button></td>`;
+            <td class="mt-del">
+                <button 
+                    class="btn-mini-del" 
+                    onclick="quitarItemPendiente(${idx}, event)" 
+                    style="background:none;border:none;cursor:pointer;color:#dc2626;font-weight:bold;padding:4px 8px;">✕</button>
+            </td>`;
         tbody.appendChild(tr);
     });
 }
 
-// ══════════════════════════════════════════════════════════
 //  CONFIRMAR → SUPABASE
-// ══════════════════════════════════════════════════════════
 async function confirmarSalidas() {
     if (!itemsPendientes.length) {
         mostrarToast('Agrega al menos un producto', 'err');
@@ -469,53 +536,51 @@ async function confirmarSalidas() {
     const tipo = modoActual;
 
     try {
+        // ── SI ES UNA EDICIÓN: Limpiar registro previo y restaurar su stock ──
+        if (salidaEdicionOriginal) {
+            const cantOrig = parseFloat(salidaEdicionOriginal.cantidad) || 0;
+            
+            // 1. Revertir stock del producto original
+            await ajustarStock(salidaEdicionOriginal.codigo, cantOrig);
+
+            // 2. Eliminar la salida antigua en Supabase
+            const { error: errDelete } = await sb
+                .from('salidas')
+                .delete()
+                .eq('id', salidaEdicionOriginal.id);
+
+            if (errDelete) throw errDelete;
+        }
+
+        // ── GUARDAR ITEMS FINALES (Nuevos o Modificados) ──
         let conteoGuardadas = 0;
 
         for (const item of itemsPendientes) {
-            // ── EDICIÓN: primero revertir stock anterior, luego aplicar nuevo ──
-            if (item._editId) {
-                // 1. Revertir stock del item original
-                await ajustarStock(item._codigoOriginal, item._cantidadOriginal); // suma de vuelta
+            // Insertar salida en Supabase
+            const { error: errInsert } = await sb.from('salidas').insert({
+                fecha:    hoy,
+                codigo:   item.codigo,
+                cantidad: String(item.cantidad),
+                hora:     hora,
+                recibe:   recibe,
+                tipo:     tipo,
+                bus:      idBus || null,
+            });
 
-                // 2. Actualizar la salida en supabase
-                const { error: errUpdate } = await sb.from('salidas').update({
-                    codigo:   item.codigo,
-                    cantidad: String(item.cantidad),
-                    recibe:   recibe,
-                    tipo:     tipo,
-                    bus:      idBus || null,
-                }).eq('id', item._editId);
+            if (errInsert) throw errInsert;
 
-                if (errUpdate) throw errUpdate;
-
-                // 3. Descontar el nuevo stock
-                await ajustarStock(item.codigo, -item.cantidad);
-
-            } else {
-                // ── INSERCIÓN NUEVA ──
-                const { error: errInsert } = await sb.from('salidas').insert({
-                    fecha:    hoy,
-                    codigo:   item.codigo,
-                    cantidad: String(item.cantidad),
-                    hora:     hora,
-                    recibe:   recibe,
-                    tipo:     tipo,
-                    bus:      idBus || null,
-                });
-
-                if (errInsert) throw errInsert;
-
-                await ajustarStock(item.codigo, -item.cantidad);
-            }
-
+            // Descontar nuevo stock
+            await ajustarStock(item.codigo, -item.cantidad);
             conteoGuardadas++;
         }
 
+        salidaEdicionOriginal = null; // Resetear estado de edición
         cerrarSheet();
         await cargarSalidas();
-        await cargarProductos(); // refrescar stocks locales
-        renderizarTodo(document.getElementById('txtBuscar').value);
-        mostrarToast(`${conteoGuardadas} salida${conteoGuardadas!==1?'s':''} guardada${conteoGuardadas!==1?'s':''}`, 'ok');
+        await cargarProductos(); // Refrescar stocks locales
+        
+        renderizarTodo(document.getElementById('txtBuscar')?.value || '');
+        mostrarToast('Cambios guardados correctamente', 'ok');
 
     } catch (err) {
         console.error('Error guardando:', err);
@@ -526,9 +591,7 @@ async function confirmarSalidas() {
     }
 }
 
-// ══════════════════════════════════════════════════════════
 //  STOCK
-// ══════════════════════════════════════════════════════════
 async function ajustarStock(codigo, delta) {
     // Solo ajustar si el producto tiene stock numérico (no null)
     const prod = todosProductos.find(p => p.codigo === codigo);
@@ -546,75 +609,129 @@ async function ajustarStock(codigo, delta) {
     else prod.stock = nuevoStock; // actualizar local
 }
 
-// ══════════════════════════════════════════════════════════
-//  LONG PRESS → MENÚ CONTEXTUAL
-// ══════════════════════════════════════════════════════════
-function iniciarLongPress(e, salida) {
-    cancelarLongPress();
-    pressTimer = setTimeout(() => {
-        salidaEnContexto = salida;
-        mostrarMenuContextual(e);
-    }, LONG_PRESS_MS);
-}
+// === MENÚ CONTEXTUAL (POR CLIC) Y ACCIONES ===
 
-function cancelarLongPress() {
-    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-}
-
-function mostrarMenuContextual(e) {
+// Cerrar menú al hacer clic fuera de él
+document.addEventListener('click', (e) => {
     const menu = document.getElementById('menuContextual');
-    menu.classList.add('visible');
+    if (menu && !menu.contains(e.target)) {
+        ocultarMenuContextual();
+    }
+});
 
-    // Posición: cerca del cursor/toque
-    let x, y;
-    if (e.touches && e.touches.length) {
-        x = e.touches[0].clientX;
-        y = e.touches[0].clientY;
-    } else {
-        x = e.clientX;
-        y = e.clientY;
+function ocultarMenuContextual() {
+    const menu = document.getElementById('menuContextual');
+    if (menu) menu.classList.remove('visible');
+}
+
+function abrirMenuContextual(e, salida) {
+    if (e) {
+        e.stopPropagation();
+        e.preventDefault();
     }
 
-    // Evitar salir de pantalla
-    const mw = 200, mh = 100;
-    x = Math.min(x, window.innerWidth  - mw - 10);
-    y = Math.min(y, window.innerHeight - mh - 10);
+    // Guardamos una copia limpia del objeto
+    salidaEnContexto = { ...salida };
 
-    menu.style.left = x + 'px';
-    menu.style.top  = y + 'px';
+    const menu = document.getElementById('menuContextual');
+    if (!menu) return;
 
-    // Vibración háptica en móvil
-    if (navigator.vibrate) navigator.vibrate(40);
+    let x = e.clientX ?? (e.touches?.[0]?.clientX || 0);
+    let y = e.clientY ?? (e.touches?.[0]?.clientY || 0);
+
+    const mw = 200, mh = 120;
+    x = Math.max(10, Math.min(x, window.innerWidth - mw - 10));
+    y = Math.max(10, Math.min(y, window.innerHeight - mh - 10));
+
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+    menu.classList.add('visible');
+
+    if (navigator.vibrate) navigator.vibrate(20);
 }
 
 function editarSalidaDesdeMenu() {
-    document.getElementById('menuContextual').classList.remove('visible');
+    ocultarMenuContextual();
     if (!salidaEnContexto) return;
+    
+    // Aseguramos pasar el objeto completo a la función encargada de poblar el Sheet/Formulario
     abrirSheet(salidaEnContexto);
 }
 
+// Modal personalizado en reemplazo de confirm()
+function confirmarEliminacionUI(mensaje) {
+    return new Promise((resolve) => {
+        let modal = document.getElementById('modalConfirmarEliminar');
+        
+        // Si no existe el HTML del modal en el DOM, lo creamos dinámicamente
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'modalConfirmarEliminar';
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+                background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px);
+                display: flex; align-items: center; justify-content: center;
+                z-index: 9999; opacity: 0; pointer-events: none; transition: opacity .2s ease;
+            `;
+            modal.innerHTML = `
+                <div style="background: white; border-radius: 12px; padding: 20px 24px; max-width: 360px; width: 90%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+                    <h4 style="margin: 0 0 8px 0; color: #0f172a; font-size: 16px;">¿Eliminar salida?</h4>
+                    <p id="msgConfirmarEliminar" style="margin: 0 0 20px 0; color: #64748b; font-size: 14px; line-height: 1.4;"></p>
+                    <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                        <button id="btnCancelDel" style="padding: 8px 14px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; color: #475569; font-weight: 600; cursor: pointer;">Cancelar</button>
+                        <button id="btnOkDel" style="padding: 8px 14px; border-radius: 6px; border: none; background: #ef4444; color: white; font-weight: 600; cursor: pointer;">Eliminar</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        document.getElementById('msgConfirmarEliminar').innerText = mensaje;
+        modal.style.opacity = '1';
+        modal.style.pointerEvents = 'auto';
+
+        const btnOk = document.getElementById('btnOkDel');
+        const btnCancel = document.getElementById('btnCancelDel');
+
+        const cerrar = (resultado) => {
+            modal.style.opacity = '0';
+            modal.style.pointerEvents = 'none';
+            btnOk.onclick = null;
+            btnCancel.onclick = null;
+            resolve(resultado);
+        };
+
+        btnOk.onclick = () => cerrar(true);
+        btnCancel.onclick = () => cerrar(false);
+    });
+}
+
 async function eliminarSalidaDesdeMenu() {
-    document.getElementById('menuContextual').classList.remove('visible');
+    ocultarMenuContextual();
     if (!salidaEnContexto) return;
 
     const s = salidaEnContexto;
     const cant = parseFloat(s.cantidad) || 0;
+    const desc = descripcionDeCodigo(s.codigo);
 
-    const confirmado = confirm(`¿Eliminar salida de ${cant} × ${descripcionDeCodigo(s.codigo)}?\nSe devolverá el stock si aplica.`);
-    if (!confirmado) return;
+    const verificado = await confirmarEliminacionUI(`Se eliminará la salida de ${cant} u. de "${desc}". El stock será restaurado automáticamente.`);
+    if (!verificado) return;
 
     try {
-        // Eliminar de Supabase
+        // 1. Eliminar en Supabase
         const { error } = await sb.from('salidas').delete().eq('id', s.id);
         if (error) throw error;
 
-        // Devolver stock (delta positivo → suma)
+        // 2. Revertir el stock
         await ajustarStock(s.codigo, cant);
 
-        // Actualizar lista local
+        // 3. Refrescar estado local
         todasSalidas = todasSalidas.filter(x => x.id !== s.id);
         await cargarProductos();
-        renderizarTodo(document.getElementById('txtBuscar').value);
+        
+        const txtBuscar = document.getElementById('txtBuscar')?.value || '';
+        renderizarTodo(txtBuscar);
+        
         mostrarToast('Salida eliminada y stock restaurado', 'ok');
     } catch (err) {
         mostrarToast('Error al eliminar: ' + err.message, 'err');

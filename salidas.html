@@ -54,6 +54,7 @@ h2 { color: #203764; margin-bottom: 20px; font-size: 28px; font-weight: normal; 
     margin-bottom: 20px;
     outline: none;
     transition: .20s;
+    text-transform: uppercase; /* Fuerza visualmente mayúsculas */
 }
 #txtBuscar:focus { border-color: #203764; box-shadow: 0 0 0 4px rgba(32,55,100,.15); }
 
@@ -217,6 +218,7 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
     font-size: 14px;
     font-family: inherit;
     background: white;
+    text-transform: uppercase; /* Fuerza visualmente mayúsculas en los inputs */
 }
 .campo input:focus, .campo select:focus { border-color: #284B87; }
 
@@ -491,6 +493,19 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
 
 <div id="toast"></div>
 
+<script>
+// Forzar conversión interna a MAYÚSCULAS en todos los campos de texto
+document.addEventListener('input', (e) => {
+    if (e.target.tagName === 'INPUT' && e.target.type === 'text') {
+        const start = e.target.selectionStart;
+        const end = e.target.selectionEnd;
+        e.target.value = e.target.value.toUpperCase();
+        if (start !== null && end !== null) {
+            e.target.setSelectionRange(start, end);
+        }
+    }
+});
+</script>
 <script src="salidas.js"></script>
 </body>
 </html>

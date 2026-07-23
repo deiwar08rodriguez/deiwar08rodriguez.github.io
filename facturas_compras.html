@@ -1,477 +1,560 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Compras | ThermoAir</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compras | ThermoAir</title>
 
-body {
-    background: #203764;
-    font-family: Calibri, "Segoe UI", Arial, sans-serif;
-    color: #1f2937;
-}
+    <!-- Librerías Externas -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
 
-header {
-    height: 80px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 35px;
-    color: white;
-}
-.logo-area { display: flex; align-items: center; }
-.logo { height: 42px; width: auto; }
-.separador { width: 2px; height: 38px; background: rgba(255,255,255,.35); margin: 0 18px; }
-.modulo { color: white; font-size: 30px; font-style: italic; font-weight: normal; }
-header a { color: white; text-decoration: none; font-size: 18px; }
-header a:hover { text-decoration: underline; }
-
-/* ── MAIN ── */
-main {
-    margin: 0 25px 25px 25px;
-    background: white;
-    border-radius: 16px;
-    padding: 30px;
-    box-shadow: 0 18px 45px rgba(0,0,0,.25);
-    min-height: calc(100vh - 105px);
-}
-
-h2 { color: #203764; margin-bottom: 24px; font-size: 34px; font-weight: normal; }
-
-/* ── BUSCADOR PRINCIPAL DE LA TABLA ── */
-#txtBuscar {
-    width: 100%;
-    padding: 16px 22px;
-    font-size: 17px;
-    border: 2px solid #d2d9e6;
-    border-radius: 10px;
-    margin-bottom: 25px;
-    outline: none;
-    transition: .20s;
-}
-#txtBuscar:focus { border-color: #203764; box-shadow: 0 0 0 4px rgba(32,55,100,.15); }
-
-/* ── TABLA PC ── */
-.table-container {
-    border-radius: 10px;
-    overflow: auto;
-    border: 1px solid #d7dde8;
-    max-height: 72vh;
-}
-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-thead th {
-    background: #284B87;
-    color: white;
-    padding: 12px 14px;
-    position: sticky;
-    top: 0;
-    text-align: left;
-    white-space: nowrap;
-    z-index: 20;
-}
-tbody td { padding: 11px 14px; border-bottom: 1px solid #e6ebf2; color: #203764; }
-tbody tr:nth-child(even) { background: #fafbfc; }
-tbody tr:hover { background: #dfe9ff; cursor: pointer; }
-
-.mobile-cards-container { display: none; }
-
-/* ── FAB ── */
-#btnNuevaFactura {
-    position: fixed;
-    bottom: 28px;
-    right: 28px;
-    width: 60px;
-    height: 60px;
-    background: #284B87;
-    color: white;
-    border: none;
-    border-radius: 50%;
-    font-size: 30px;
-    cursor: pointer;
-    box-shadow: 0 4px 15px rgba(0,0,0,.35);
-    z-index: 999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* ── SHEET OVERLAY FORMULARIO NUEVA FACTURA ── */
-#overlaySheet {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,.5);
-    z-index: 1000;
-}
-#overlaySheet.visible { display: block; }
-
-#hojaSheet {
-    position: fixed;
-    bottom: -100%;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 100%;
-    max-width: 950px;
-    background: white;
-    border-radius: 20px 20px 0 0;
-    box-shadow: 0 -5px 25px rgba(0,0,0,.2);
-    z-index: 1001;
-    transition: bottom .3s ease-out;
-    max-height: 95vh;
-    display: flex;
-    flex-direction: column;
-}
-#hojaSheet.visible { bottom: 0; }
-
-.sheet-handle {
-    width: 50px;
-    height: 5px;
-    background: #cbd5e1;
-    border-radius: 3px;
-    margin: 12px auto 6px auto;
-    flex-shrink: 0;
-    cursor: pointer;
-}
-
-.sheet-header-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 20px;
-    border-bottom: 1px solid #f1f5f9;
-    flex-shrink: 0;
-}
-
-.sheet-titulo {
-    color: #203764;
-    font-size: 18px;
-    font-weight: bold;
-}
-
-.sheet-body { 
-    padding: 16px 20px; 
-    overflow-y: auto; 
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-}
-
-/* Grillas Estructuradas */
-.grid-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.grid-tres { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
-.grid-cuatro { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.grid-precio-margen { display: grid; grid-template-columns: 1fr 55px; gap: 12px; }
-
-/* Panel de Variación y Auditoría Operacional */
-.panel-auditoria-costos {
-    background: #f0fdf4;
-    border: 1.5px dashed #16a34a;
-    border-radius: 10px;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 2px;
-}
-.badge-variacion {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: bold;
-    text-align: center;
-}
-.badge-alza { background: #fee2e2; color: #991b1b; }
-.badge-baja { background: #dcfce7; color: #166534; }
-.badge-neutro { background: #f1f5f9; color: #475569; }
-
-/* Evitar colapso en cabeceras fijos */
-.bloque-estatico { flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; }
-
-/* Zona de Carga Integrada */
-.upload-box {
-    border: 2px dashed #b2c0d6;
-    background: #f8fafc;
-    border-radius: 12px;
-    padding: 15px;
-    text-align: center;
-    cursor: pointer;
-    transition: all .2s;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 5px;
-}
-.upload-box:hover { border-color: #284B87; background: #edf4ff; }
-.upload-box svg { width: 30px; height: 30px; color: #284B87; }
-.upload-box p { font-size: 13px; color: #284B87; font-weight: bold; }
-#fileInput { display: none; }
-
-/* Status de Carga IA */
-.status-box {
-    display: none;
-    background: #f1f5f9;
-    border: 1px solid #cbd5e1;
-    border-radius: 10px;
-    padding: 12px;
-    align-items: center;
-    gap: 10px;
-    font-size: 13px;
-    color: #334155;
-}
-.spinner {
-    width: 16px;
-    height: 16px;
-    border: 2px solid #cbd5e1;
-    border-top-color: #284B87;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* Campos del form */
-.campo { display: flex; flex-direction: column; position: relative; }
-.campo label {
-    font-size: 11px;
-    font-weight: bold;
-    color: #203764;
-    margin-bottom: 4px;
-    text-transform: uppercase;
-    letter-spacing: .4px;
-}
-.campo input {
-    width: 100%;
-    padding: 12px 14px;
-    border: 1.5px solid #cbd5e1;
-    border-radius: 8px;
-    outline: none;
-    font-size: 15px;
-    font-family: inherit;
-    background: white;
-}
-.campo input:focus { border-color: #284B87; }
-.campo input:read-only { background: #f1f5f9; color: #64748b; border-color: #cbd5e1; cursor: not-allowed; }
-
-/* Dividers de sección */
-.mini-tabla-titulo {
-    font-size: 12px;
-    font-weight: bold;
-    color: #475569;
-    text-transform: uppercase;
-    letter-spacing: .4px;
-    margin-top: 5px;
-    margin-bottom: -5px;
-    flex-shrink: 0;
-}
-
-/* Alertas de homologación pendiente */
-.alerta-homologar {
-    padding: 10px 14px;
-    background: #fff1f2;
-    border: 1px solid #fecdd3;
-    border-radius: 8px;
-    color: #9f1239;
-    font-size: 13px;
-    font-weight: bold;
-    display: none;
-}
-
-/* ── CAJA CONTENEDORA GRIS DEL BUSCADOR DE ITEMS ── */
-.buscador-productos-box {
-    background: #f8fafc;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    width: 100%;
-    position: relative;
-    flex-shrink: 0;
-}
-
-/* ── DROPDOWN PREDICTIVOS ── */
-.dropdown-predictivo {
-    display: none;
-    background: white;
-    border: 1.5px solid #284B87;
-    border-radius: 8px;
-    max-height: 180px;
-    overflow-y: auto;
-    position: absolute;
-    top: 72px;
-    left: 12px;
-    right: 12px;
-    z-index: 1200;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
-}
-
-.dropdown-item {
-    padding: 11px 14px;
-    cursor: pointer;
-    border-bottom: 1px solid #f1f5f9;
-    font-size: 14px;
-    color: #1f2937;
-}
-.dropdown-item:hover { background: #dfe9ff; color: #203764; }
-
-.btn-agregar-item {
-    width: 100%;
-    padding: 12px;
-    background: #284B87;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-weight: bold;
-    font-size: 14px;
-    cursor: pointer;
-}
-.btn-agregar-item:hover { background: #203764; }
-
-/* Contenedor inferior adaptado al tamaño exacto de referencia */
-.grid-botones-confirmar {
-    display: grid;
-    grid-template-columns: 1fr 55px; /* Deja el botón confirmar flexible y el engranaje fijo */
-    gap: 12px;
-    width: 100%;
-    margin-top: 5px;
-    flex-shrink: 0;
-}
-
-.btn-config-avanzada {
-    background: #f1f5f9;
-    color: #284B87;
-    border: 1.5px solid #cbd5e1;
-    border-radius: 10px; /* Igual que .btn-confirmar */
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-    height: 100%; /* Forza la misma altura que el botón confirmar */
-}
-.btn-config-avanzada:hover {
-    background: #e2e8f0;
-    border-color: #284B87;
-}
-.btn-config-avanzada:disabled {
-    background: #cbd5e1;
-    color: #94a3b8;
-    cursor: not-allowed;
-    border-color: #cbd5e1;
-}
-.btn-config-avanzada svg {
-    width: 22px;
-    height: 22px;
-}
-
-/* ── MINI TABLA DETALLE DE FACTURA DE COMPRA ── */
-.mini-tabla-wrap {
-    border: 1.5px solid #cbd5e1;
-    border-radius: 8px;
-    overflow-y: auto;
-    min-height: 160px;
-    max-height: 250px;
-    background: white;
-    width: 100%;
-    display: block !important;
-}
-.mini-tabla-wrap table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.mini-tabla-wrap thead th {
-    background: #475569;
-    color: white;
-    padding: 10px 12px;
-    text-align: left;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-}
-.mini-tabla-wrap tbody td { 
-    padding: 8px 10px; /* Un poco más compacto horizontalmente */
-    border-bottom: 1px solid #e2e8f0; 
-    color: #1f2937;
-    vertical-align: middle;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 0;
-}
-.fila-pendiente { background: #fee2e2 !important; }
-.fila-pendiente td { color: #991b1b !important; }
-
-/* Panel de totales y confirmación */
-.panel-totales {
-    background: #f8fafc;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    flex-shrink: 0;
-}
-.total-linea { display: flex; justify-content: space-between; font-size: 14px; color: #475569; }
-.total-linea.gran-total {
-    font-size: 20px;
-    font-weight: bold;
-    color: #203764;
-    border-top: 1.5px dashed #cbd5e1;
-    padding-top: 8px;
-    margin-top: 2px;
-}
-
-.btn-confirmar {
-    width: 100%;
-    padding: 14px;
-    background: #10b981;
-    color: white;
-    border: none;
-    border-radius: 10px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    flex-shrink: 0;
-    margin-top: 5px;
-}
-.btn-confirmar:hover { background: #059669; }
-.btn-confirmar:disabled { background: #cbd5e1; color: #94a3b8; cursor: not-allowed; }
-
-/* ── TOAST ── */
-#toast {
-    position: fixed;
-    bottom: 100px;
-    left: 50%;
-    transform: translateX(-50%) translateY(20px);
-    background: #1e293b;
-    color: white;
-    padding: 12px 22px;
-    border-radius: 10px;
-    font-size: 14px;
-    font-weight: bold;
-    opacity: 0;
-    transition: opacity .25s, transform .25s;
-    z-index: 3000;
-    pointer-events: none;
-    white-space: nowrap;
-}
-#toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-/* ════════════════════════════════════
-    📱 VISTA MÓVIL
-   ════════════════════════════════════ */
-@media (max-width: 768px) {
-    body { background: white; }
-    main { margin: 0; padding: 15px; border-radius: 0; box-shadow: none; }
-    .table-container { display: none; }
-    .mobile-cards-container { display: flex; flex-direction: column; }
-    #hojaSheet { max-width: 100%; height: 100vh; max-height: 100vh; border-radius: 0; }
-}
-</style>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #203764;
+            font-family: Calibri, "Segoe UI", Arial, sans-serif;
+            color: #1f2937;
+            min-height: 100vh;
+        }
+        header {
+            height: 80px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 35px;
+            color: white;
+            background: #203764;
+        }
+        .logo-area { display: flex; align-items: center; }
+        .logo { height: 42px; width: auto; }
+        .separador { width: 2px; height: 38px; background: rgba(255,255,255,.35); margin: 0 18px; }
+        .modulo { color: white; font-size: 30px; font-style: italic; font-weight: normal; }
+        header a { color: white; text-decoration: none; font-size: 18px; }
+        header a:hover { text-decoration: underline; }
+        
+        /* ── MAIN ── */
+        main {
+            margin: 0 25px 25px 25px;
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 18px 45px rgba(0,0,0,.25);
+            min-height: calc(100vh - 105px);
+        }
+        h2 { color: #203764; margin-bottom: 24px; font-size: 34px; font-weight: normal; }
+        
+        /* ── BUSCADOR PRINCIPAL DE LA TABLA ── */
+        #txtBuscar {
+            width: 100%;
+            padding: 16px 22px;
+            font-size: 17px;
+            border: 2px solid #d2d9e6;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            outline: none;
+            transition: .20s;
+        }
+        #txtBuscar:focus { border-color: #203764; box-shadow: 0 0 0 4px rgba(32,55,100,.15); }
+        
+        /* ── TABLA PC ── */
+        .table-container {
+            border-radius: 10px;
+            overflow: auto;
+            border: 1px solid #d7dde8;
+            max-height: 72vh;
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        thead th {
+            background: #284B87;
+            color: white;
+            padding: 12px 14px;
+            position: sticky;
+            top: 0;
+            text-align: left;
+            white-space: nowrap;
+            z-index: 20;
+        }
+        tbody td { padding: 11px 14px; border-bottom: 1px solid #e6ebf2; color: #203764; }
+        tbody tr:nth-child(even) { background: #fafbfc; }
+        tbody tr:hover { background: #dfe9ff; cursor: pointer; }
+        .btn-ver-detalle {
+            background: #edf4ff;
+            color: #284B87;
+            border: 1px solid #b2c0d6;
+            border-radius: 6px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s;
+        }
+        .btn-ver-detalle:hover {
+            background: #284B87;
+            color: white;
+        }
+        
+        /* ── CARDS MÓVIL ── */
+        .mobile-cards-container { display: none; flex-direction: column; gap: 12px; }
+        .card-factura-mobile {
+            background: white;
+            border: 1px solid #d7dde8;
+            border-radius: 12px;
+            padding: 14px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.04);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .card-header-mobile {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            color: #203764;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 6px;
+        }
+        .card-row-mobile { display: flex; justify-content: space-between; font-size: 13px; color: #475569; }
+        
+        /* ── FAB ── */
+        #btnNuevaFactura {
+            position: fixed;
+            bottom: 28px;
+            right: 28px;
+            width: 60px;
+            height: 60px;
+            background: #284B87;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 30px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,.35);
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* ── SHEET OVERLAY FORMULARIO NUEVA FACTURA ── */
+        #overlaySheet, .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.5);
+            z-index: 1000;
+        }
+        #overlaySheet.visible, .modal-overlay.visible { display: block; }
+        #hojaSheet {
+            position: fixed;
+            bottom: -100%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 950px;
+            background: white;
+            border-radius: 20px 20px 0 0;
+            box-shadow: 0 -5px 25px rgba(0,0,0,.2);
+            z-index: 1001;
+            transition: bottom .3s ease-out;
+            max-height: 95vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #hojaSheet.visible { bottom: 0; }
+        .sheet-handle {
+            width: 50px;
+            height: 5px;
+            background: #cbd5e1;
+            border-radius: 3px;
+            margin: 12px auto 6px auto;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+        .sheet-header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            border-bottom: 1px solid #f1f5f9;
+            flex-shrink: 0;
+        }
+        .sheet-titulo {
+            color: #203764;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .sheet-body { 
+            padding: 16px 20px; 
+            overflow-y: auto; 
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        
+        /* Grillas Estructuradas */
+        .grid-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .grid-tres { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+        .grid-cuatro { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .grid-precio-margen { display: grid; grid-template-columns: 1fr 55px; gap: 12px; }
+        
+        /* Panel de Variación y Auditoría */
+        .panel-auditoria-costos {
+            background: #f0fdf4;
+            border: 1.5px dashed #16a34a;
+            border-radius: 10px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 2px;
+        }
+        .bloque-estatico { flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; }
+        
+        /* Zona de Carga Integrada */
+        .upload-box {
+            border: 2px dashed #b2c0d6;
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all .2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+        .upload-box:hover { border-color: #284B87; background: #edf4ff; }
+        .upload-box svg { width: 30px; height: 30px; color: #284B87; }
+        .upload-box p { font-size: 13px; color: #284B87; font-weight: bold; }
+        #fileInput { display: none; }
+        
+        /* Status de Carga IA */
+        .status-box {
+            display: none;
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 12px;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: #334155;
+        }
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #cbd5e1;
+            border-top-color: #284B87;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* Campos del form */
+        .campo { display: flex; flex-direction: column; position: relative; }
+        .campo label {
+            font-size: 11px;
+            font-weight: bold;
+            color: #203764;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: .4px;
+        }
+        .campo input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 8px;
+            outline: none;
+            font-size: 15px;
+            font-family: inherit;
+            background: white;
+            color: #1f2937;
+        }
+        .campo input:focus { border-color: #284B87; }
+        .campo input:read-only { background: #f1f5f9; color: #64748b; border-color: #cbd5e1; cursor: not-allowed; }
+        
+        .mini-tabla-titulo {
+            font-size: 12px;
+            font-weight: bold;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: .4px;
+            margin-top: 5px;
+            margin-bottom: -5px;
+            flex-shrink: 0;
+        }
+        .alerta-homologar {
+            padding: 10px 14px;
+            background: #fff1f2;
+            border: 1px solid #fecdd3;
+            border-radius: 8px;
+            color: #9f1239;
+            font-size: 13px;
+            font-weight: bold;
+            display: none;
+        }
+        
+        /* ── BUSCADOR ITEMS ── */
+        .buscador-productos-box {
+            background: #f8fafc;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+            position: relative;
+            flex-shrink: 0;
+        }
+        .dropdown-predictivo {
+            display: none;
+            background: white;
+            border: 1.5px solid #284B87;
+            border-radius: 8px;
+            max-height: 180px;
+            overflow-y: auto;
+            position: absolute;
+            top: 72px;
+            left: 12px;
+            right: 12px;
+            z-index: 1200;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+        }
+        .dropdown-item {
+            padding: 11px 14px;
+            cursor: pointer;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 14px;
+            color: #1f2937;
+        }
+        .dropdown-item:hover { background: #dfe9ff; color: #203764; }
+        .btn-agregar-item {
+            width: 100%;
+            padding: 12px;
+            background: #284B87;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .btn-agregar-item:hover { background: #203764; }
+        
+        .grid-botones-confirmar {
+            display: grid;
+            grid-template-columns: 1fr 55px;
+            gap: 12px;
+            width: 100%;
+            margin-top: 5px;
+            flex-shrink: 0;
+        }
+        .btn-config-avanzada {
+            background: #f1f5f9;
+            color: #284B87;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            height: 100%;
+        }
+        .btn-config-avanzada:hover { background: #e2e8f0; border-color: #284B87; }
+        .btn-config-avanzada:disabled { background: #cbd5e1; color: #94a3b8; cursor: not-allowed; border-color: #cbd5e1; }
+        .btn-config-avanzada svg { width: 22px; height: 22px; }
+        
+        /* ── MINI TABLA DETALLE ── */
+        .mini-tabla-wrap {
+            border: 1.5px solid #cbd5e1;
+            border-radius: 8px;
+            overflow-y: auto;
+            min-height: 160px;
+            max-height: 250px;
+            background: white;
+            width: 100%;
+            display: block !important;
+        }
+        .mini-tabla-wrap table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .mini-tabla-wrap thead th {
+            background: #475569;
+            color: white;
+            padding: 10px 12px;
+            text-align: left;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .mini-tabla-wrap tbody td { 
+            padding: 8px 10px;
+            border-bottom: 1px solid #e2e8f0; 
+            color: #1f2937;
+            vertical-align: middle;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .fila-pendiente { background: #fee2e2 !important; }
+        .fila-pendiente td { color: #991b1b !important; }
+        
+        /* Panel de totales y confirmación */
+        .panel-totales {
+            background: #f8fafc;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .total-linea { display: flex; justify-content: space-between; font-size: 14px; color: #475569; }
+        .total-linea.gran-total {
+            font-size: 20px;
+            font-weight: bold;
+            color: #203764;
+            border-top: 1.5px dashed #cbd5e1;
+            padding-top: 8px;
+            margin-top: 2px;
+        }
+        .btn-confirmar {
+            width: 100%;
+            padding: 14px;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            flex-shrink: 0;
+            margin-top: 5px;
+        }
+        .btn-confirmar:hover { background: #059669; }
+        .btn-confirmar:disabled { background: #cbd5e1; color: #94a3b8; cursor: not-allowed; }
+        
+        /* ── MODAL DETALLE ── */
+        .modal-detalle {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            z-index: 2000;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .modal-detalle.visible { display: flex; }
+        .modal-header {
+            background: #203764;
+            color: white;
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h3 { font-size: 20px; font-weight: normal; }
+        .btn-cerrar-modal {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .modal-body {
+            padding: 20px 24px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .detalles-grid-header {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            background: #f8fafc;
+            padding: 14px;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+        }
+        .detalles-item-lbl { font-size: 11px; color: #64748b; font-weight: bold; text-transform: uppercase; }
+        .detalles-item-val { font-size: 15px; color: #203764; font-weight: bold; margin-top: 2px; }
+        .btn-adjunto-pdf {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #284B87;
+            color: white;
+            text-decoration: none;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: bold;
+            width: fit-content;
+        }
+        .btn-adjunto-pdf:hover { background: #203764; }
+        
+        /* ── TOAST ── */
+        #toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: #1e293b;
+            color: white;
+            padding: 12px 22px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity .25s, transform .25s;
+            z-index: 3000;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        #toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+        
+        /* 📱 VISTA MÓVIL Y RESPONSIVA */
+        @media (max-width: 768px) {
+            header {
+                padding: 0 15px;
+                height: 65px;
+            }
+            .modulo { font-size: 22px; }
+            .logo { height: 32px; }
+            .separador { height: 28px; margin: 0 10px; }
+            header a { font-size: 14px; }
+            main { 
+                margin: 0; 
+                padding: 15px; 
+                border-radius: 0; 
+                box-shadow: none; 
+                min-height: calc(100vh - 65px);
+            }
+            h2 { font-size: 24px; margin-bottom: 16px; }
+            .table-container { display: none; }
+            .mobile-cards-container { display: flex; }
+            .grid-dos, .grid-cuatro { grid-template-columns: 1fr; }
+            #hojaSheet { max-width: 100%; height: 100vh; max-height: 100vh; border-radius: 0; }
+            .detalles-grid-header { grid-template-columns: 1fr; }
+        }
+    </style>
 </head>
 <body>
 
@@ -487,7 +570,8 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
 <main>
     <h2>Historial de Facturas de Compra</h2>
     <input type="text" id="txtBuscar" placeholder="Buscar por número de factura o proveedor...">
-
+    
+    <!-- VISTA ESCRITORIO (TABLA) -->
     <div class="table-container" id="vistaPC">
         <table>
             <thead>
@@ -496,29 +580,31 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
                     <th>PROVEEDOR</th>
                     <th>FECHA EMISIÓN</th>
                     <th style="text-align:center;">ADJUNTO</th>
-                    <th>SUBTOTAL</th>
-                    <th>IVA</th>
-                    <th>TOTAL NETO</th>
+                    <th style="text-align:right;">SUBTOTAL</th>
+                    <th style="text-align:right;">IVA</th>
+                    <th style="text-align:right;">TOTAL NETO</th>
+                    <th style="text-align:center;">ACCIONES</th>
                 </tr>
             </thead>
             <tbody id="tablaBody"></tbody>
         </table>
     </div>
 
+    <!-- VISTA MÓVIL (TARJETAS) -->
     <div class="mobile-cards-container" id="vistaMobile"></div>
 </main>
 
 <button id="btnNuevaFactura" title="Nueva Factura de Compra">+</button>
 
+<!-- SHEET FORMULARIO NUEVA FACTURA -->
 <div id="overlaySheet"></div>
 <div id="hojaSheet">
     <div class="sheet-handle" id="sheetHandle"></div>
     <div class="sheet-header-container">
         <div class="sheet-titulo">Nueva Factura de Compra</div>
     </div>
-    
+
     <div class="sheet-body">
-        
         <div class="bloque-estatico">
             <div class="upload-box" id="dropZone" onclick="document.getElementById('fileInput').click()">
                 <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -527,19 +613,16 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
                 <p>Arrastre un PDF aquí para autocompletar con IA</p>
                 <input type="file" id="fileInput" accept="application/pdf">
             </div>
-
             <div class="status-box" id="statusBox">
                 <div class="spinner"></div>
                 <span id="statusText">Leyendo...</span>
             </div>
-
             <div class="grid-dos">
                 <div class="campo"><label>Proveedor</label><input type="text" id="inputProveedor" readonly placeholder="Extraído por IA"></div>
                 <div class="campo"><label>N° Factura</label><input type="text" id="inputIdFac" readonly placeholder="Extraído por IA"></div>
             </div>
-
             <div class="campo"><label>Fecha Emisión</label><input type="date" id="inputFecha" readonly></div>
-            
+
             <div class="alerta-homologar" id="alertaHomologar">
                 Ítems sin correspondencia interna. Selecciónelo en la tabla inferior y asígnele un código válido de ThermoAir aquí abajo.
             </div>
@@ -550,7 +633,6 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
                 <label>Producto (Según Factura de Compra)</label>
                 <input type="text" id="inputProducto" placeholder="Nombre extraído del PDF..." readonly>
             </div>
-
             <div class="grid-dos">
                 <div class="campo">
                     <label id="lblBuscador">Homologar con (Base de Datos ThermoAir)</label>
@@ -559,8 +641,7 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
                 </div>
                 <div class="campo"><label>Costo Unitario</label><input type="text" id="inputCosto" value="$0" style="text-align:right;" readonly></div>
             </div>
-
-<div class="panel-auditoria-costos">
+            <div class="panel-auditoria-costos">
                 <div class="grid-cuatro">
                     <div class="campo"><label style="color:#1e293b;">Costo Anterior</label><input type="text" id="txtAuditoriaCostoAnterior" value="$0" readonly style="background:#fff; font-size:13px; text-align:right;" title="Último costo registrado en el sistema"></div>
                     <div class="campo"><label style="color:#1e293b;">Costo Nuevo</label><input type="text" id="txtAuditoriaCostoNuevo" value="$0" readonly style="background:#fff; font-size:13px; text-align:right;" title="Costo que viene en este PDF"></div>
@@ -568,7 +649,6 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
                     <div class="campo"><label style="color:#1e293b;">Precio Actual</label><input type="text" id="txtAuditoriaPrecioActual" value="$0" readonly style="background:#fff; font-size:13px; text-align:right;" title="Precio de venta al público vigente"></div>
                 </div>
             </div>
-
             <div class="grid-dos">
                 <div class="campo"><label>Precio Sugerido</label><input type="text" id="txtPrecioSugerido" readonly style="font-weight:bold; background:#f8fafc; border-color:#cbd5e1;"></div>
                 <div class="grid-precio-margen">
@@ -580,8 +660,8 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
                         <label style="color:#284B87;">Margen</label>
                         <input type="text" id="txtMargen" value="%0" style="border-color:#284B87; font-weight:bold; text-align:center;">
                     </div>
-</div>
-</div>
+                </div>
+            </div>
             <button type="button" class="btn-agregar-item" id="btnAgregarItem" onclick="agregarLineaManual()">Guardar Cambios</button>
         </div>
 
@@ -590,9 +670,9 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 12%;">CODIGO</th>
+                        <th style="width: 12%;">CÓDIGO</th>
                         <th style="width: 42%;">DESCRIPCIÓN</th>
-                        <th style="width: 7%; text-align: center;">CANTIDAD</th>
+                        <th style="width: 7%; text-align: center;">CANT.</th>
                         <th style="width: 13%; text-align: right;">NUEVO COSTO</th>
                         <th style="width: 14%; text-align: right;">NUEVO PRECIO</th>
                         <th style="width: 12%; text-align: center;">MARGEN</th>
@@ -610,24 +690,64 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
                 <span id="resumenIva">$0</span>
             </div>
             <div class="total-linea gran-total">
-                <span>TOTAL FACTURA:</span>
+                <span>Total Factura:</span>
                 <span id="resumenTotal">$0</span>
             </div>
-        </div>
-
-        <div class="grid-botones-confirmar">
-            <button class="btn-confirmar" id="btnConfirmar" onclick="guardarFacturaSupabase()" disabled style="margin-top: 0;">Actualizar Inventario y Guardar</button>
-            <button type="button" class="btn-config-avanzada" id="btnMenuAvanzado" title="Configuración de Enrutamiento Avanzado (Siigo)" onclick="abrirMenuAvanzadoSiigo()" disabled>
-                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.767a1.123 1.123 0 00-.417 1.03c.004.074.006.148.006.222 0 .074-.002.148-.006.222a1.123 1.123 0 00.417 1.03l1.003.767a1.125 1.125 0 01.26 1.43l-1.296 2.247a1.125 1.125 0 01-1.37.49l-1.216-.456a1.125 1.125 0 00-1.07.124c-.073.044-.146.087-.22.128-.332.183-.582.495-.644.869l-.213 1.28c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.02-.397-1.11-.94l-.213-1.281a1.125 1.125 0 00-.646-.87c-.074-.04-.147-.083-.22-.127a1.124 1.124 0 00-1.074-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.767a1.122 1.122 0 00.416-1.03c-.004-.074-.006-.148-.006-.222 0-.074.002-.148.006-.222a1.122 1.122 0 00-.416-1.03l-1.004-.767a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.49l1.216.456c.356.133.751.072 1.076-.124.072-.041.146-.084.218-.128.333-.183.582-.495.645-.869l.214-1.28z"></path>
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                </svg>
-            </button>
+            <div class="grid-botones-confirmar">
+                <button type="button" class="btn-confirmar" id="btnConfirmar" disabled>Confirmar e Ingresar Compra</button>
+                <button type="button" class="btn-config-avanzada" id="btnConfigAvanzada" title="Configuración Avanzada">
+                    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                </button>
+            </div>
         </div>
     </div>
 </div>
 
-<div id="toast"></div>
+<!-- MODAL DETALLE FACTURA REGISTRADA -->
+<div class="modal-overlay" id="overlayModal"></div>
+<div class="modal-detalle" id="modalDetalle">
+    <div class="modal-header">
+        <h3 id="modalTituloFac">Detalle de Factura</h3>
+        <button class="btn-cerrar-modal" onclick="cerrarModalDetalle()">×</button>
+    </div>
+    <div class="modal-body">
+        <div class="detalles-grid-header">
+            <div>
+                <div class="detalles-item-lbl">Proveedor</div>
+                <div class="detalles-item-val" id="modalProveedor">-</div>
+            </div>
+            <div>
+                <div class="detalles-item-lbl">Fecha Emisión</div>
+                <div class="detalles-item-val" id="modalFecha">-</div>
+            </div>
+            <div>
+                <div class="detalles-item-lbl">Total Neto</div>
+                <div class="detalles-item-val" id="modalTotal">-</div>
+            </div>
+        </div>
+        <div id="modalPdfArea"></div>
+        <div class="mini-tabla-titulo">Ítems Comprados</div>
+        <div class="mini-tabla-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>CÓDIGO</th>
+                        <th>DESCRIPCIÓN</th>
+                        <th style="text-align:center;">CANT.</th>
+                        <th style="text-align:right;">COSTO UNIT.</th>
+                        <th style="text-align:right;">SUBTOTAL</th>
+                    </tr>
+                </thead>
+                <tbody id="modalTablaItems"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="toast">Notificación</div>
 
 <script src="facturas_compras.js"></script>
 </body>

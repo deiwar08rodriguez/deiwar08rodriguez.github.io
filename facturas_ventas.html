@@ -16,18 +16,20 @@ body {
 
 /* ── HEADER ── */
 header {
-    height: 80px;
+    min-height: 70px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0 35px;
+    padding: 12px 20px;
     color: white;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 .logo-area { display: flex; align-items: center; }
-.logo { height: 42px; width: auto; }
-.separador { width: 2px; height: 38px; background: rgba(255,255,255,.35); margin: 0 18px; }
-.modulo { color: white; font-size: 30px; font-style: italic; font-weight: normal; }
-header a { color: white; text-decoration: none; font-size: 18px; }
+.logo { height: 36px; width: auto; }
+.separador { width: 2px; height: 28px; background: rgba(255,255,255,.35); margin: 0 12px; }
+.modulo { color: white; font-size: 22px; font-style: italic; font-weight: normal; }
+header a { color: white; text-decoration: none; font-size: 15px; font-weight: bold; }
 header a:hover { text-decoration: underline; }
 
 /* ── MAIN ── */
@@ -35,21 +37,21 @@ main {
     margin: 0 25px 25px 25px;
     background: white;
     border-radius: 16px;
-    padding: 30px;
+    padding: 25px;
     box-shadow: 0 18px 45px rgba(0,0,0,.25);
-    min-height: calc(100vh - 105px);
+    min-height: calc(100vh - 95px);
 }
 
-h2 { color: #203764; margin-bottom: 24px; font-size: 34px; font-weight: normal; }
+h2 { color: #203764; margin-bottom: 20px; font-size: 28px; font-weight: normal; }
 
 /* ── BUSCADOR PRINCIPAL DE LA TABLA ── */
 #txtBuscar {
     width: 100%;
-    padding: 16px 22px;
-    font-size: 17px;
+    padding: 14px 18px;
+    font-size: 16px;
     border: 2px solid #d2d9e6;
     border-radius: 10px;
-    margin-bottom: 25px;
+    margin-bottom: 20px;
     outline: none;
     transition: .20s;
 }
@@ -77,20 +79,37 @@ tbody td { padding: 11px 14px; border-bottom: 1px solid #e6ebf2; color: #203764;
 tbody tr:nth-child(even) { background: #fafbfc; }
 tbody tr:hover { background: #dfe9ff; cursor: pointer; }
 
-.mobile-cards-container { display: none; }
+/* ── CARDS HISTORIAL MÓVIL ── */
+.mobile-cards-container { display: none; flex-direction: column; gap: 12px; }
+.factura-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+}
+.factura-card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
+.factura-numero { font-weight: bold; color: #284B87; font-size: 15px; }
+.factura-fecha { font-size: 12px; color: #64748b; }
+.factura-cliente { font-weight: bold; color: #1e3a8a; font-size: 15px; line-height: 1.3; margin-top: 2px; }
+.factura-sub { font-size: 12px; color: #3b82f6; text-transform: uppercase; }
+.factura-total { font-size: 18px; font-weight: 800; color: #203764; margin-top: 4px; text-align: right; }
 
 /* ── FAB ── */
 #btnNuevaFactura {
     position: fixed;
-    bottom: 28px;
-    right: 28px;
-    width: 60px;
-    height: 60px;
+    bottom: 24px;
+    right: 24px;
+    width: 56px;
+    height: 56px;
     background: #284B87;
     color: white;
     border: none;
     border-radius: 50%;
-    font-size: 30px;
+    font-size: 28px;
     cursor: pointer;
     box-shadow: 0 4px 15px rgba(0,0,0,.35);
     z-index: 999;
@@ -121,18 +140,18 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
     box-shadow: 0 -5px 25px rgba(0,0,0,.2);
     z-index: 1001;
     transition: bottom .3s ease-out;
-    max-height: 95vh;
+    max-height: 90vh;
     display: flex;
     flex-direction: column;
 }
 #hojaSheet.visible { bottom: 0; }
 
 .sheet-handle {
-    width: 50px;
+    width: 40px;
     height: 5px;
     background: #cbd5e1;
     border-radius: 3px;
-    margin: 12px auto 6px auto;
+    margin: 10px auto 4px auto;
     flex-shrink: 0;
     cursor: pointer;
 }
@@ -141,21 +160,21 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 20px;
+    padding: 10px 16px;
     border-bottom: 1px solid #f1f5f9;
     flex-shrink: 0;
 }
 
 .sheet-titulo {
     color: #203764;
-    font-size: 18px;
+    font-size: 17px;
     font-weight: bold;
 }
 
 .btn-limpiar {
     background: transparent;
     border: 1px solid #cbd5e1;
-    padding: 6px 12px;
+    padding: 5px 10px;
     border-radius: 6px;
     color: #64748b;
     cursor: pointer;
@@ -165,15 +184,16 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
 .btn-limpiar:hover { background: #f1f5f9; color: #dc2626; border-color: #dc2626; }
 
 .sheet-body { 
-    padding: 16px 20px; 
+    padding: 16px; 
     overflow-y: auto; 
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 12px;
 }
+
 /* Grillas Estructuradas */
-.grid-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .grid-tres { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
 
 /* Toggle Producto / Mano de obra */
@@ -186,10 +206,10 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
 }
 .toggle-tipo button {
     flex: 1;
-    padding: 10px 0;
+    padding: 9px 0;
     border: none;
     border-radius: 7px;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: bold;
     cursor: pointer;
     background: transparent;
@@ -212,11 +232,11 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
 }
 .campo input, .campo select {
     width: 100%;
-    padding: 12px 14px;
+    padding: 10px 12px;
     border: 1.5px solid #cbd5e1;
     border-radius: 8px;
     outline: none;
-    font-size: 15px;
+    font-size: 14px;
     font-family: inherit;
     background: white;
 }
@@ -230,7 +250,7 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
     padding: 12px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
     width: 100%;
     position: relative;
 }
@@ -244,37 +264,36 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
     max-height: 180px;
     overflow-y: auto;
     position: absolute;
-    top: 68px;
+    top: 62px;
     left: 0;
     right: 0;
     z-index: 1200;
     box-shadow: 0 4px 14px rgba(0,0,0,0.15);
 }
 
-/* Variación específica del dropdown interno de la caja de productos */
 .buscador-productos-box .dropdown-predictivo {
     left: 12px;
     right: 12px;
-    top: 72px;
+    top: 68px;
 }
 
 .dropdown-item {
-    padding: 11px 14px;
+    padding: 10px 12px;
     cursor: pointer;
     border-bottom: 1px solid #f1f5f9;
-    font-size: 14px;
+    font-size: 13px;
     color: #1f2937;
 }
 .dropdown-item:hover { background: #dfe9ff; color: #203764; }
 
 .mini-tabla-titulo {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: bold;
     color: #475569;
     text-transform: uppercase;
     letter-spacing: .4px;
-    margin-top: 5px;
-    margin-bottom: -5px;
+    margin-top: 4px;
+    margin-bottom: -4px;
 }
 
 .mini-tabla-wrap {
@@ -282,22 +301,21 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
     border-radius: 8px;
     background: white;
     width: 100%;
-    display: block !important;
-    height: auto;
+    overflow-x: auto;
 }
 
-.mini-tabla-wrap table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.mini-tabla-wrap table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 480px; }
 .mini-tabla-wrap thead th {
     background: #475569;
     color: white;
-    padding: 10px 12px;
+    padding: 8px 10px;
     text-align: left;
     position: sticky;
     top: 0;
     z-index: 10;
 }
 .mini-tabla-wrap tbody td { 
-    padding: 10px 12px; 
+    padding: 8px 10px; 
     border-bottom: 1px solid #e2e8f0; 
     color: #1f2937;
     vertical-align: middle;
@@ -305,13 +323,13 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
 
 .btn-agregar-item {
     width: 100%;
-    padding: 12px;
+    padding: 10px;
     background: #284B87;
     color: white;
     border: none;
     border-radius: 8px;
     font-weight: bold;
-    font-size: 14px;
+    font-size: 13px;
     cursor: pointer;
 }
 .btn-agregar-item:hover { background: #203764; }
@@ -320,14 +338,14 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
     background: #f8fafc;
     border: 1.5px solid #e2e8f0;
     border-radius: 12px;
-    padding: 14px;
+    padding: 12px;
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
-.total-linea { display: flex; justify-content: space-between; font-size: 14px; color: #475569; }
+.total-linea { display: flex; justify-content: space-between; font-size: 13px; color: #475569; }
 .total-linea.gran-total {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: bold;
     color: #203764;
     border-top: 1.5px dashed #cbd5e1;
@@ -337,26 +355,23 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
 
 .btn-confirmar {
     width: 100%;
-    padding: 14px;
+    padding: 12px;
     background: #10b981;
     color: white;
     border: none;
     border-radius: 10px;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: bold;
     cursor: pointer;
-    flex-shrink: 0;
-    margin-top: 5px;
 }
 .btn-confirmar:hover { background: #059669; }
 
-/* Contenedor inferior adaptado al tamaño exacto de referencia */
 .grid-botones-confirmar {
     display: grid;
-    grid-template-columns: 1fr 55px; /* Deja el botón confirmar flexible y el engranaje fijo */
-    gap: 12px;
+    grid-template-columns: 1fr 50px;
+    gap: 10px;
     width: 100%;
-    margin-top: 5px;
+    margin-top: 4px;
     flex-shrink: 0;
 }
 
@@ -364,27 +379,21 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
     background: #f1f5f9;
     color: #284B87;
     border: 1.5px solid #cbd5e1;
-    border-radius: 10px; /* Igual que .btn-confirmar */
+    border-radius: 10px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.2s;
-    height: 100%; /* Forza la misma altura que el botón confirmar */
+    height: 100%;
 }
 .btn-config-avanzada:hover {
     background: #e2e8f0;
     border-color: #284B87;
 }
-.btn-config-avanzada:disabled {
-    background: #cbd5e1;
-    color: #94a3b8;
-    cursor: not-allowed;
-    border-color: #cbd5e1;
-}
 .btn-config-avanzada svg {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
 }
 
 /* ── MENU CONTEXTUAL ── */
@@ -396,7 +405,7 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
     box-shadow: 0 8px 30px rgba(0,0,0,.18);
     z-index: 2000;
     overflow: hidden;
-    min-width: 180px;
+    min-width: 160px;
     border: 1px solid #e2e8f0;
 }
 #menuContextual.visible { display: block; }
@@ -404,7 +413,7 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 13px 18px;
+    padding: 12px 16px;
     font-size: 14px;
     font-weight: bold;
     cursor: pointer;
@@ -418,14 +427,14 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
 /* ── TOAST ── */
 #toast {
     position: fixed;
-    bottom: 100px;
+    bottom: 90px;
     left: 50%;
     transform: translateX(-50%) translateY(20px);
     background: #1e293b;
     color: white;
-    padding: 12px 22px;
+    padding: 10px 20px;
     border-radius: 10px;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: bold;
     opacity: 0;
     transition: opacity .25s, transform .25s;
@@ -436,72 +445,39 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
 #toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* ════════════════════════════════════
-    📱 VISTA MÓVIL
+   📱 VISTA MÓVIL (PANTALLAS CHICAS)
    ════════════════════════════════════ */
 @media (max-width: 768px) {
-    body { background: white; }
-    main { margin: 0; padding: 15px; border-radius: 0; box-shadow: none; }
+    header {
+        padding: 10px 16px;
+    }
+    .logo { height: 30px; }
+    .modulo { font-size: 18px; }
+    .separador { height: 20px; margin: 0 8px; }
+    header a { font-size: 13px; }
+
+    main { 
+        margin: 0; 
+        padding: 16px 12px; 
+        border-radius: 0; 
+        box-shadow: none; 
+        min-height: calc(100vh - 60px);
+    }
+    
+    h2 { font-size: 22px; margin-bottom: 14px; }
+    #txtBuscar { padding: 12px 14px; font-size: 14px; margin-bottom: 16px; }
+
     .table-container { display: none; }
-    .mobile-cards-container { display: flex; flex-direction: column; gap: 12px; }
+    .mobile-cards-container { display: flex; }
     
-    /* Estructura de tarjetas para Historial de Facturas */
-    .factura-card {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 14px;
-        display: flex;
-        flex-direction: column;
-        position: relative;
-        gap: 4px;
-    }
-    .factura-card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 4px; }
-    .factura-numero { font-weight: bold; color: #284B87; font-size: 15px; }
-    .factura-fecha { font-size: 12px; color: #64748b; }
-    .factura-cliente { font-weight: bold; color: #1e3a8a; font-size: 15px; line-height: 1.3; }
-    .factura-sub { font-size: 12px; color: #3b82f6; text-transform: uppercase; }
-    .factura-total { font-size: 20px; font-weight: 800; color: #203764; margin-top: 6px; text-align: right; }
-
-/* Adaptación de la Mini-Tabla dentro del Formulario */
-    .mini-tabla-wrap { display: block !important; overflow-x: auto; width: 100%; } 
-    .mini-cards-items-container { display: none !important; }
+    /* Pasa las grillas dobles a una sola columna en pantallas pequeñas */
+    .grid-dos { grid-template-columns: 1fr; gap: 10px; }
     
-    .item-vinculado-card {
-        background: #f8fafc;
-        border: 1px solid #cbd5e1;
-        border-radius: 8px;
-        padding: 10px 12px;
-        display: flex;
-        flex-direction: column;
-        position: relative;
-        gap: 2px;
-    }
-    .item-vinculado-detalles { padding-right: 30px; }
-    .item-vinculado-titulo { font-weight: bold; color: #1e3a8a; font-size: 14px; }
-    .item-vinculado-meta { font-size: 12px; color: #475569; }
-    .item-vinculado-total { font-weight: bold; color: #203764; font-size: 14px; text-align: right; margin-top: 4px; border-top: 1px dashed #e2e8f0; padding-top: 4px; }
-    .btn-eliminar-item-movil {
-        position: absolute;
-        top: 10px;
-        right: 12px;
-        background: transparent;
-        border: none;
-        color: #dc2626;
-        font-size: 18px;
-        cursor: pointer;
-    }
-
     #hojaSheet { 
         max-width: 100%; 
-        height: 100vh; 
-        max-height: 100vh; 
-        border-radius: 0; 
+        max-height: 92vh; 
+        border-radius: 16px 16px 0 0; 
     }
-}
-
-/* Ocultar el contenedor alternativo de ítems cuando estemos en PC */
-@media (min-width: 769px) {
-    .mini-cards-items-container { display: none !important; }
 }
 </style>
 </head>
@@ -587,7 +563,7 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
             <div class="campo"><label>Placa Vehículo</label><input type="text" id="txtPlaca" placeholder="Ej: STR123"></div>
         </div>
 
-        <hr style="border:none;border-top:1px solid #f1f5f9;margin-bottom:4px;">
+        <hr style="border:none;border-top:1px solid #f1f5f9;margin:2px 0;">
 
         <div class="buscador-productos-box">
             <div class="toggle-tipo" id="toggleModoItem">
@@ -620,7 +596,7 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
             <input type="text" id="txtPrecioManoObraGlobal" placeholder="Ingrese valor acordado si aplica">
         </div>
 
-<div class="mini-tabla-titulo">Ítems Listos para Facturar en esta Venta</div>
+        <div class="mini-tabla-titulo">Ítems Listos para Facturar en esta Venta</div>
         
         <div class="mini-tabla-wrap">
             <table>
@@ -636,7 +612,7 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
                 </thead>
                 <tbody id="miniTablaItemsFactura">
                     <tr>
-                        <td colspan="6" style="text-align:center; color:#94a3b8; padding:20px;">
+                        <td colspan="6" style="text-align:center; color:#94a3b8; padding:15px;">
                             Ningún ítem agregado a la pre-venta todavía.
                         </td>
                     </tr>
@@ -664,7 +640,7 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
         </div>
 
         <div class="grid-botones-confirmar">
-            <button type="button" class="btn-confirmar" id="btnConfirmarGenerarFactura" style="margin-top: 0;">Confirmar y Generar Factura</button>
+            <button type="button" class="btn-confirmar" id="btnConfirmarGenerarFactura">Confirmar y Generar Factura</button>
             <button type="button" class="btn-config-avanzada" id="btnMenuAvanzadoFactura" title="Configuración de Enrutamiento Avanzado (Siigo)" onclick="abrirMenuAvanzadoSiigo()">
                 <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.767a1.123 1.123 0 00-.417 1.03c.004.074.006.148.006.222 0 .074-.002.148-.006.222a1.123 1.123 0 00.417 1.03l1.003.767a1.125 1.125 0 01.26 1.43l-1.296 2.247a1.125 1.125 0 01-1.37.49l-1.216-.456a1.125 1.125 0 00-1.07.124c-.073.044-.146.087-.22.128-.332.183-.582.495-.644.869l-.213 1.28c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.02-.397-1.11-.94l-.213-1.281a1.125 1.125 0 00-.646-.87c-.074-.04-.147-.083-.22-.127a1.124 1.124 0 00-1.074-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.767a1.122 1.122 0 00.416-1.03c-.004-.074-.006-.148-.006-.222 0-.074.002-.148.006-.222a1.122 1.122 0 00-.416-1.03l-1.004-.767a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.49l1.216.456c.356.133.751.072 1.076-.124.072-.041.146-.084.218-.128.333-.183.582-.495.645-.869l.214-1.28z"></path>

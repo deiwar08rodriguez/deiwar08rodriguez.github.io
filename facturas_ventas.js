@@ -1,7 +1,4 @@
-// ══════════════════════════════════════════════════════════════════════════════
 // THERMOAIR SAS - SISTEMA DE FACTURACIÓN DE VENTAS
-// Corregido: Cálculos consistentes de totales y envío correcto a Siigo
-// ══════════════════════════════════════════════════════════════════════════════
 
 // ── CONFIGURACIÓN SUPABASE ──
 const SUPABASE_URL  = 'https://vdlxmajvzdtbewchyowm.supabase.co';
@@ -235,26 +232,39 @@ function cerrarFormulario() {
 }
 
 // El buscador ahora es inmediato: Solo lee la tabla local de Supabase
+// ==========================================
+// UTILIDAD DEBOUNCE (Para evitar spam a la BD)
+// ==========================================
+function debounce(fn, delay = 300) {
+    let timeoutId;
+    return function (...args) {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => fn.apply(this, args), delay);
+    };
+}
+
+// ==========================================
+// 1. BUSCADOR DE CLIENTES (CORREGIDO)
+// ==========================================
 async function buscarClientesPredictivo(busqueda) {
     const divDropdown = document.getElementById('dropdownClientes');
     if (!divDropdown) return;
-    
-    if (!busqueda || busqueda.trim().length < 2) { divDropdown.style.display = 'none'; return; }
+
+    const query = (busqueda || '').trim();
+
+    // Mínimo 2 caracteres
+    if (query.length < 2) { 
+        divDropdown.style.display = 'none'; 
+        return; 
+    }
 
     try {
-        const query = busqueda.trim();
+        let queryBuilder = sb.from('terceros_siigo').select('*');
 
-        let queryBuilder = sb
-            .from('terceros_siigo')
-            .select('Id1, nombre, id, direccion, Ciudad, telefono, contacto');
+        // Búsqueda flexible por Nombre O por NIT/Cédula
+        queryBuilder = queryBuilder.or(`nombre.ilike.%${query}%,num_id.ilike.%${query}%`);
 
-        if (/^\d+$/.test(query)) {
-            queryBuilder = queryBuilder.or(`nombre.ilike.%${query}%,id.ilike.%${query}%`);
-        } else {
-            queryBuilder = queryBuilder.ilike('nombre', `%${query}%`);
-        }
-
-        const { data, error } = await queryBuilder.limit(15);
+        const { data, error } = await queryBuilder.limit(10);
 
         if (error || !data || data.length === 0) { 
             divDropdown.innerHTML = '<div class="dropdown-item" style="color:#94a3b8; cursor:default; padding:10px;">No hay resultados locales</div>';
@@ -268,56 +278,71 @@ async function buscarClientesPredictivo(busqueda) {
         data.forEach(cliente => {
             const item = document.createElement('div');
             item.className = 'dropdown-item';
-            item.textContent = `${cliente.nombre} (${cliente.id})`;
+            item.textContent = `${cliente.nombre} (${cliente.num_id})`;
             item.style.cursor = 'pointer';
 
             item.addEventListener('click', () => {
                 document.getElementById('comboCliente').value = cliente.nombre;
                 document.getElementById('txtEmpresa').value = cliente.nombre;
-                document.getElementById('txtNitCc').value = cliente.id;
+                document.getElementById('txtNitCc').value = cliente.num_id;
                 
                 document.getElementById('txtDireccion').value = cliente.direccion || '';
-                document.getElementById('txtCiudad').value = cliente.Ciudad || '';
+                document.getElementById('txtCiudad').value = cliente.ciudad || '';
                 document.getElementById('txtTelefono').value = cliente.telefono || '';
                 
-                clienteSeleccionado = { 
+                clienteSeleccionado = {
                     id1: cliente.Id1,
-                    id: cliente.id, 
-                    name: cliente.nombre, 
-                    identification: cliente.id,
+                    id: cliente.num_id,
+                    identification: cliente.num_id,
+                    tipo_id: cliente.tipo_id,
+                    tipo_iva: cliente.tipo_iva,
+                    person_type: cliente.person_type,
+                    siigo_id: cliente.siigo_id || cliente.id || cliente.Id || cliente.Id1,
+                    name: cliente.nombre,
                     direccion: cliente.direccion,
-                    ciudad: cliente.Ciudad,
+                    ciudad: cliente.ciudad,
                     telefono: cliente.telefono,
-                    contacto: cliente.contacto
+                    estado: cliente.estado
                 };
                 divDropdown.style.display = 'none';
             });
             divDropdown.appendChild(item);
         });
     } catch (err) {
-        console.error('Error en buscador local:', err);
+        console.error('Error en buscador de clientes:', err);
     }
 }
 
+// ==========================================
+// 2. BUSCADOR DE PRODUCTOS (OPTIMIZADO)
+// ==========================================
 async function buscarProductosPredictivo(busqueda) {
     const divDropdown = document.getElementById('dropdownProductosForm');
-    if (!divDropdown) { console.error("Elemento 'dropdownProductosForm' no existe."); return; }
+    if (!divDropdown) return;
 
-    if (busqueda.length < 2) { divDropdown.style.display = 'none'; return; }
+    const query = (busqueda || '').trim();
+
+    if (query.length < 2) { 
+        divDropdown.style.display = 'none'; 
+        return; 
+    }
 
     try {
         const { data, error } = await sb
             .from('productos')
             .select('*')
-            .or(`codigo.ilike.%${busqueda}%,descripcion.ilike.%${busqueda}%`)
-            .limit(5);
+            .or(`codigo.ilike.%${query}%,descripcion.ilike.%${query}%`)
+            .limit(8);
 
         if (error) {
             console.error('Supabase Error (buscarProductos):', error);
             return;
         }
 
-        if (!data || data.length === 0) { divDropdown.style.display = 'none'; return; }
+        if (!data || data.length === 0) { 
+            divDropdown.style.display = 'none'; 
+            return; 
+        }
 
         divDropdown.innerHTML = '';
         divDropdown.style.display = 'block';
@@ -326,12 +351,18 @@ async function buscarProductosPredictivo(busqueda) {
             const item = document.createElement('div');
             item.className = 'dropdown-item';
             item.textContent = `[${p.codigo}] ${p.descripcion}`;
+            item.style.cursor = 'pointer';
+
             item.addEventListener('click', () => {
                 document.getElementById('comboProducto').value = p.descripcion;
-                document.getElementById('txtPrecioUnitItem').value = Math.round(p.precio_venta || 0);
+                const inputPrecio = document.getElementById('txtPrecioUnitItem');
+                if (inputPrecio) inputPrecio.value = Math.round(p.precio_venta || 0);
+                
                 productoSeleccionado = p;
                 divDropdown.style.display = 'none';
-                document.getElementById('txtCantidadItem').focus();
+                
+                const inputCantidad = document.getElementById('txtCantidadItem');
+                if (inputCantidad) inputCantidad.focus();
             });
             divDropdown.appendChild(item);
         });
@@ -340,43 +371,37 @@ async function buscarProductosPredictivo(busqueda) {
     }
 }
 
+// ==========================================
+// 3. BUSCADOR DE SERVICIOS (OPTIMIZADO)
+// ==========================================
 async function buscarServiciosPredictivo(busqueda) {
-    console.log(`Ejecutando buscarServiciosPredictivo para: "${busqueda}"`);
     const divDropdown = document.getElementById('dropdownServicios');
-    
-    if (!divDropdown) { 
-        console.error("ERROR CRÍTICO UI: El contenedor id 'dropdownServicios' NO existe en el HTML."); 
-        return; 
-    }
+    if (!divDropdown) return;
 
-    if (!busqueda || busqueda.trim().length < 2) { 
+    const termino = (busqueda || '').trim();
+
+    // Mínimo 3 caracteres para servicios para evitar búsquedas vacías
+    if (termino.length < 3) { 
         divDropdown.style.display = 'none'; 
         return; 
     }
-
-    const termino = busqueda.trim();
 
     try {
         const { data, error } = await sb
             .from('servicios')
             .select('codigo, descripcion, precio')
             .or(`codigo.ilike.%${termino}%,descripcion.ilike.%${termino}%`) 
-            .limit(5);
+            .limit(10);
 
         if (error) {
-            console.error('¡SUPABASE RETORNÓ UN ERROR EN SERVICIOS!:', error);
-            if (typeof mostrarToast === 'function') {
-                mostrarToast(`Error Base de Datos: ${error.message}`, 'err');
-            }
+            console.error('Error en Supabase (servicios):', error);
             return;
         }
 
-        console.log("Datos crudos recibidos de servicios:", data);
-
+        // Excluir código consolidado si aplica
         const datosFiltrados = (data || []).filter(s => String(s.codigo).toUpperCase() !== 'SR01');
 
         if (datosFiltrados.length === 0) { 
-            console.warn(`No se encontraron registros válidos en 'servicios' para "${termino}".`);
             divDropdown.style.display = 'none'; 
             return; 
         }
@@ -387,6 +412,8 @@ async function buscarServiciosPredictivo(busqueda) {
         datosFiltrados.forEach(s => {
             const item = document.createElement('div');
             item.className = 'dropdown-item';
+            item.style.cursor = 'pointer';
+            
             const cod = s.codigo || 'S/C';
             const desc = s.descripcion || 'Sin descripción';
             
@@ -394,14 +421,11 @@ async function buscarServiciosPredictivo(busqueda) {
             
             item.addEventListener('click', () => {
                 const inputComboServicio = document.getElementById('comboServicio');
-                if (inputComboServicio) {
-                    inputComboServicio.value = desc;
-                }
+                if (inputComboServicio) inputComboServicio.value = desc;
 
                 const inputPrecio = document.getElementById('txtPrecioUnitItem');
                 if (inputPrecio) {
-                    const precioNumerico = parseFloat(s.precio) || 0;
-                    inputPrecio.value = Math.round(precioNumerico);
+                    inputPrecio.value = Math.round(parseFloat(s.precio) || 0);
                 }
 
                 servicioSeleccionado = s;
@@ -413,10 +437,9 @@ async function buscarServiciosPredictivo(busqueda) {
             divDropdown.appendChild(item);
         });
     } catch (err) {
-        console.error('Excepción fatal atrapada en buscarServiciosPredictivo:', err);
+        console.error('Excepción en buscarServiciosPredictivo:', err);
     }
 }
-
 //  GESTIÓN DE TABLA DE DETALLE (PRODUCTOS / MANO DE OBRA)
 function vincularItemDetalle() {
     try {
@@ -490,6 +513,82 @@ function vincularItemDetalle() {
         servicioSeleccionado = null;
     } catch (err) {
         console.error("Error en vincularItemDetalle:", err);
+    }
+}
+
+// ── FUNCIÓN DE CONEXIÓN INMEDIATA: FACTURAR BUS ──
+function iniciarFacturacionDesdeBus(datosBus) {
+    try {
+        console.log("Iniciando precarga de datos desde el bus:", datosBus);
+        
+        // 1. Limpiar el formulario y el estado anterior
+        limpiarFormularioComplete(); 
+        itemsAgregados = [];
+        
+        // 2. Precargar Datos del Cliente y Vehículo en los inputs
+        if (datosBus.cliente) {
+            document.getElementById('txtEmpresa').value = datosBus.cliente.nombre || '';
+            document.getElementById('txtNitCc').value = datosBus.cliente.id || '';
+            document.getElementById('txtDireccion').value = datosBus.cliente.direccion || '';
+            document.getElementById('txtCiudad').value = datosBus.cliente.Ciudad || '';
+            document.getElementById('txtTelefono').value = datosBus.cliente.telefono || '';
+            
+            // Guardar en tu variable global de cliente para mantener consistencia
+            clienteSeleccionado = {
+                id1: datosBus.cliente.Id1,
+                id: datosBus.cliente.id,
+                name: datosBus.cliente.nombre,
+                identification: datosBus.cliente.id,
+                direccion: datosBus.cliente.direccion,
+                ciudad: datosBus.cliente.Ciudad,
+                telefono: datosBus.cliente.telefono
+            };
+        }
+        
+        // Campos adicionales del vehículo/bus (si los tienes en tu HTML)
+        if (document.getElementById('txtPlaca')) {
+            document.getElementById('txtPlaca').value = datosBus.placa || '';
+        }
+        if (document.getElementById('txtBusNo')) {
+            document.getElementById('txtBusNo').value = datosBus.busNo || '';
+        }
+
+        // 3. Mapear e inyectar los ítems del Bus al detalle de la venta
+        if (datosBus.items && datosBus.items.length > 0) {
+            datosBus.items.forEach((item, index) => {
+                const cantidad = parseFloat(item.cantidad) || 1;
+                const precioUnit = parseFloat(item.precio_unitario || item.precio) || 0;
+                
+                itemsAgregados.push({
+                    id_temp: Date.now() + index, // IDs únicos temporales
+                    type: item.tipo || 'PRODUCTO', // 'PRODUCTO', 'SERVICIO' o 'MANO_OBRA'
+                    tipo: item.tipo || 'PRODUCTO',
+                    codigo: item.codigo || 'GENERICO',
+                    descripcion: item.descripcion || 'Ítem importado',
+                    shadow_descripcion: item.descripcion || 'Ítem importado',
+                    cantidad: cantidad,
+                    precio_unitario: precioUnit,
+                    descuento_item: parseFloat(item.descuento) || 0,
+                    total: cantidad * precioUnit
+                });
+            });
+        }
+
+        // 4. Si el bus viene con un valor de Mano de Obra Global específico
+        if (datosBus.manoObraGlobal && document.getElementById('txtPrecioManoObraGlobal')) {
+            document.getElementById('txtPrecioManoObraGlobal').value = Math.round(datosBus.manoObraGlobal);
+        }
+
+        // 5. Actualizar la UI de la factura y calcular totales
+        renderMiniTabla();
+        calcularTotalesLiquidacion();
+        
+        // 6. ¡Abrir el formulario de golpe!
+        abrirFormulario();
+        
+    } catch (err) {
+        console.error("Error al transferir los datos del bus al formulario de facturación:", err);
+        alert("Hubo un problema al precargar los datos del bus.");
     }
 }
 
@@ -866,7 +965,10 @@ async function guardarFacturaBaseDatos(tipoFacturacion) {
     }
 }
 
-// FUNCIÓN CRÍTICA: ENVÍO A SIIGO CON CAPTURA ULTRA DETALLADA DE ERRORES
+// VERSIÓN CORREGIDA: Teléfono limpio, iva_incluido dinámico, payload validado
+// ══════════════════════════════════════════════════════════════════════════════
+// CONFIGURACIÓN Y ENVÍO RECALCULADO PARA EVITAR DESCUADRES CON SIIGO (ERROR 400)
+// ══════════════════════════════════════════════════════════════════════════════
 async function enviarFacturaASiigo(facturaData, siigoClienteId) {
     try {
         const itemsOriginales = JSON.parse(facturaData.ITEMS) || [];
@@ -885,16 +987,18 @@ async function enviarFacturaASiigo(facturaData, siigoClienteId) {
         // 1. FILTRAR ÍTEMS DE PRODUCTOS/REPUESTOS VÁLIDOS
         const itemsFiltrados = itemsOriginales.filter(item => !esManoObra(item));
         
-        const itemsFormateados = itemsFiltrados.map(item => ({
-            codigo: String(item.codigo),
-            descripcion: String(item.descripcion || item.detalle || 'PRODUCTO'),
-            cantidad: parseFloat(item.cantidad) || 1,
-            precio_unitario: parseFloat(item.precio_unitario || item.total) || 0, // Mandamos valor bruto (con IVA)
-            descuento_item: parseFloat(item.descuento_item) || 0,
-            aplica_iva: true,
-            iva_incluido: true // Avisamos a la Edge Function que ya incluye IVA
-            // Se elimina el array taxes con el ID estático 1249 para usar el dinámico resuelto en el backend
-        }));
+        const itemsFormateados = itemsFiltrados.map(item => {
+            const esProducto = !esManoObra(item);
+            return {
+                codigo: String(item.codigo),
+                descripcion: String(item.descripcion || item.detalle || 'PRODUCTO'),
+                cantidad: parseFloat(item.cantidad) || 1,
+                precio_unitario: parseFloat(item.precio_unitario || item.total) || 0,
+                descuento_item: parseFloat(item.descuento_item) || 0,
+                aplica_iva: true,
+                iva_incluido: esProducto  // true para productos
+            }
+        });
 
         // 2. EXTRAER Y CALCULAR MANO DE OBRA TOTAL
         const lineasManoObraLibre = itemsOriginales.filter(item => esManoObra(item));
@@ -913,11 +1017,10 @@ async function enviarFacturaASiigo(facturaData, siigoClienteId) {
                 codigo: 'SR01',
                 descripcion: 'MANO DE OBRA CONSOLIDADA',
                 cantidad: 1,
-                precio_unitario: valorManoObraConsolidado, // El servicio va directo sin recalcular
+                precio_unitario: valorManoObraConsolidado,
                 descuento_item: 0,
                 aplica_iva: true, 
-                iva_incluido: false // El servicio se calcula directo
-                // Se elimina el array taxes con el ID estático 1249 para usar el dinámico resuelto en el backend
+                iva_incluido: false  // Los servicios van sin IVA incluido para que el API sume el impuesto base
             });
         }
 
@@ -955,39 +1058,83 @@ async function enviarFacturaASiigo(facturaData, siigoClienteId) {
             observacionesFinales = bloquesObservaciones.join("\n");
         }
 
-        // 4. TOTAL NETO REAL
-        const totales = window.totalesFactura || { totalNeto: 0, descuentoAplicado: 0, subtotalBruto: 0 };
-        const totalFinalCalculado = Math.round(totales.totalNeto);
+        // 4. RECALCULO MATEMÁTICO STRICTO PARA PREVENIR EL ERROR 400
+        let subtotalRecalculado = 0;
+        itemsFormateados.forEach(it => {
+            subtotalRecalculado += (it.cantidad * it.precio_unitario) - it.descuento_item;
+        });
 
-        // 5. ARMAR PAYLOAD
+        const descuentoGlobal = Math.round(parseFloat(window.totalesFactura?.descuentoAplicado) || 0);
+        const subtotalFinal = Math.round(subtotalRecalculado);
+        
+        // 5. LIMPIEZA ROBUSTA DE TELÉFONO
+        let telefonoLimpio = "3003793474"; // Default
+        const telefonoRaw = document.getElementById('txtTelefono')?.value || '';
+        
+        if (telefonoRaw) {
+            let tempTel = String(telefonoRaw)
+                .replace(/\s+/g, '')        
+                .replace(/-/g, '')           
+                .replace(/\(/g, '').replace(/\)/g, '') 
+                .replace(/\+/g, '')          
+                .replace(/^0/, '')           
+                .replace(/^57/, '')          
+            
+            if (tempTel.length >= 7 && tempTel.length <= 10 && /^\d+$/.test(tempTel)) {
+                telefonoLimpio = tempTel;
+                console.log(`[TELÉFONO] Limpiado: ${telefonoRaw} → ${telefonoLimpio}`);
+            } else {
+                console.warn(`[TELÉFONO] Formato inválido, usando default: ${telefonoLimpio}`);
+            }
+        }
+
+        // 5.5 DETERMINAR RELACIÓN CORRECTA DE IDENTIFICACIÓN PARA SIIGO
+        let tipoIdCorregido = String(facturaData.tipo_id || 'NIT').toUpperCase();
+        const tipoPersona = tipoIdCorregido === 'NIT' ? 'Company' : 'Person';
+        
+        if (tipoPersona === 'Person' && tipoIdCorregido === 'NIT') {
+            console.log("[SIIGO SINCRO] Corrigiendo tipo_id de NIT a CC porque el cliente es Persona Natural.");
+            tipoIdCorregido = "CC"; 
+        }
+
+        // NUEVO: Mapear tipo_id al código numérico oficial requerido por el API de Siigo
+        // NIT -> 31, Cédula de Ciudadanía (CC) -> 13. Si viene otra cosa, asignamos CC por seguridad.
+        const mapaCodigosSiigo = {
+            'NIT': '31',
+            'CC': '13',
+            'CÉDULA DE CIUDADANÍA': '13',
+            'CEDULA DE CIUDADANIA': '13'
+        };
+        const idTypeSiigoNum = mapaCodigosSiigo[tipoIdCorregido] || '13';
+
+        // 6. ARMAR PAYLOAD CON VALORES DE DETALLE SINCRO
         const payloadSiigo = {
             cliente_siigo_id: String(siigoClienteId || ''), 
-            nit_cliente: String(facturaData.NIT),           
-            fecha: String(facturaData.FECHA),
+            nit_cliente: String(facturaData.NIT || facturaData.nit_cliente),           
+            person_type: tipoPersona,              // 'Company' o 'Person'
+            tipo_id: tipoIdCorregido,              // Para control interno si lo usas en el backend
+            id_type: idTypeSiigoNum,               // ✓ NUEVO: Enviado explícitamente ("31" o "13")
+            tipo_iva: String(facturaData.tipo_iva || 'ResponsableInscripto'),
+            fecha: String(facturaData.FECHA || facturaData.fecha),
             items: itemsFormateados,
-            subtotal: Math.round(totales.subtotalBruto), 
-            descuento: Math.round(totales.descuentoAplicado),
-            total: totalFinalCalculado,                                
+            subtotal: subtotalFinal, 
+            descuento: descuentoGlobal,
+            total: Math.round(window.totalesFactura?.totalNeto) || subtotalFinal, 
             forma_pago: window.configAvanzadaSiigo?.formaPago || 'efectivo',
             observaciones: observacionesFinales,
-            direccion: document.getElementById('txtDireccion')?.value || '',
-            ciudad: document.getElementById('txtCiudad')?.value || '',
-            telefono: document.getElementById('txtTelefono')?.value || '',
-            empresa: String(facturaData.CLIENTE),
+            direccion: document.getElementById('txtDireccion')?.value || 'CL49 No 12 25',
+            ciudad: document.getElementById('txtCiudad')?.value || 'Soledad',
+            telefono: telefonoLimpio,  
+            empresa: String(facturaData.CLIENTE || facturaData.empresa),
             busNo: String(busNum || ''),
             placa: String(placaVehiculo || ''),
-            idFactura: String(Date.now()),
-            payments: [
-                {
-                    id: 5, 
-                    value: totalFinalCalculado 
-                }
-            ]
+            idFactura: String(Date.now())
         };
 
-        console.log("PAYLOAD ENVIADO A SIIGO:", JSON.stringify(payloadSiigo, null, 2));
+        console.log("%c[PAYLOAD OPTIMIZADO] Enviado a Siigo:", "color: #10b981; font-weight: bold;");
+        console.log(JSON.stringify(payloadSiigo, null, 2));
 
-        // 6. INVOCACIÓN DE LA EDGE FUNCTION
+        // 7. INVOCACIÓN DE LA EDGE FUNCTION
         const { data, error } = await sb.functions.invoke('facturar-siigo', {
             body: payloadSiigo
         });
@@ -1002,7 +1149,7 @@ async function enviarFacturaASiigo(facturaData, siigoClienteId) {
                     console.error("%cRespuesta detallada de Siigo:", "color: #f97316; font-weight: bold;", errorDetallado);
                     
                     if (typeof mostrarToast === 'function') {
-                        const msgErr = errorDetallado.message || errorDetallado.Errors?.[0]?.Message || "Revisa la consola";
+                        const msgErr = errorDetallado.message || errorDetallado.errors?.[0]?.message || "Error de validación en parámetros";
                         mostrarToast(`Error Siigo: ${msgErr}`, 'err');
                     }
                 } catch (jsonErr) {
@@ -1013,14 +1160,22 @@ async function enviarFacturaASiigo(facturaData, siigoClienteId) {
         }
 
         if (data && data.success) {
-            console.log("%c✓ Factura sincronizada con Siigo!", "color: #22c55e; font-weight: bold;");
+            console.log("%c✓ Factura sincronizada con Siigo!", "color: #22c55e; font-weight: bold; font-size: 16px;");
             if (typeof mostrarToast === 'function') {
                 mostrarToast('✓ Factura Sincronizada con Siigo Correctamente');
+            }
+        } else {
+            console.error("[ERROR] Respuesta inesperada:", data);
+            if (typeof mostrarToast === 'function') {
+                mostrarToast('Error: Respuesta inesperada de Siigo', 'err');
             }
         }
 
     } catch (err) {
-        console.error("Excepción fatal en enviarFacturaASiigo:", err);
+        console.error("%c[EXCEPCIÓN FATAL]", "color: #dc2626; font-weight: bold;", err.message);
+        if (typeof mostrarToast === 'function') {
+            mostrarToast(`Error crítico: ${err.message}`, 'err');
+        }
     }
 }
 
@@ -1158,6 +1313,24 @@ function formatMoneda(valor) {
         maximumFractionDigits: 0
     }).format(n);
 }
+
+// 🚀 ACCIÓN: DETECTAR PRECARGA DESDE EL BUS
+document.addEventListener("DOMContentLoaded", () => {
+    const datosPrecargados = localStorage.getItem('datosBusPrecarga');
+    if (datosPrecargados) {
+        try {
+            const datosBus = JSON.parse(datosPrecargados);
+            
+            // 1. Ejecutar la función de precarga con el objeto recuperado
+            iniciarFacturacionDesdeBus(datosBus);
+            
+            // 2. Limpiar la memoria para que no se vuelva a abrir al recargar la página manualmente
+            localStorage.removeItem('datosBusPrecarga');
+        } catch (e) {
+            console.error("Error al procesar la precarga del bus:", e);
+        }
+    }
+});
 
 let toastTimer = null;
 function mostrarToast(msg, tipo = '') {

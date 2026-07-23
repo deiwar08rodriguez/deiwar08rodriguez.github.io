@@ -8,6 +8,16 @@ let listaSalidas = [];
 let mapaProductos = new Map(); 
 let timeoutBusqueda;
 
+// ═══════════════════════════════════════════════════════════
+//  DOBLE CLIC: VARIABLES Y LÓGICA
+// ═══════════════════════════════════════════════════════════
+let clickTimer = null;
+let busEnContexto = null;
+let fotoEditarFile = null;
+
+// ═══════════════════════════════════════════════════════════
+//  VISOR DE IMAGEN
+// ═══════════════════════════════════════════════════════════
 function abrirVisorImagen(urlFoto) {
     if (!urlFoto) return; 
     const modal = document.getElementById('visorImagenModal');
@@ -18,6 +28,21 @@ function abrirVisorImagen(urlFoto) {
     }
 }
 
+// ═══════════════════════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════════════════════
+let toastTimer = null;
+function mostrarToast(msg, tipo = '') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'visible ' + tipo;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.className = '', 3000);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FORMATEO
+// ═══════════════════════════════════════════════════════════
 function formatoMoneda(valor) {
     return Number(valor ?? 0).toLocaleString("es-CO", {
         style: "currency",
@@ -31,6 +56,9 @@ function formatoFechaVisual(fechaStr) {
     return `${fechaStr[8]}${fechaStr[9]}/${fechaStr[5]}${fechaStr[6]}/${fechaStr[2]}${fechaStr[3]}`;
 }
 
+// ═══════════════════════════════════════════════════════════
+//  CARGA INICIAL DE DATOS
+// ═══════════════════════════════════════════════════════════
 async function inicializarBuses() {
     try {
         console.time("⚡ Carga Paralela Supabase");
@@ -54,9 +82,13 @@ async function inicializarBuses() {
         renderizarBuses(listaBuses);
     } catch (error) {
         console.error("Error cargando datos:", error);
+        mostrarToast('Error al cargar datos', 'err');
     }
 }
 
+// ═══════════════════════════════════════════════════════════
+//  RENDERIZADO PRINCIPAL
+// ═══════════════════════════════════════════════════════════
 function renderizarBuses(datosBuses) {
     const contenedor = document.getElementById("contenedorBuses");
     if (!contenedor) return;
@@ -64,6 +96,10 @@ function renderizarBuses(datosBuses) {
         contenedor.innerHTML = `<p style="text-align:center; color:#284B87; padding:20px; font-weight:bold;">No se encontraron registros.</p>`;
         return;
     }
+
+    // Detectar si el usuario es Técnico
+    const sessionArea = sessionStorage.getItem("session_area") || "";
+    const esTecnico = sessionArea.toLowerCase().trim() === "tecnico";
 
     let html = "";
     const salidasPorBus = {};
@@ -92,6 +128,8 @@ function renderizarBuses(datosBuses) {
             const horaFormateada = salida.hora ? salida.hora.slice(0, 5) : "---";
             const quienRecibe = salida.recibe ?? "---";
 
+            const celdaPrecioHtml = esTecnico ? "" : `<td class="precio">${formatoMoneda(precioVenta)}</td>`;
+
             tablaSalidasHtml += `
             <tr>
                 <td>${fechaFormateada}</td>
@@ -99,15 +137,17 @@ function renderizarBuses(datosBuses) {
                 <td class="col-codigo">${salida.codigo ?? ""}</td>
                 <td class="col-descripcion">${descripcion}</td>
                 <td class="cantidad">${cantidadNum}</td>
-                <td class="precio">${formatoMoneda(precioVenta)}</td>
+                ${celdaPrecioHtml}
                 <td class="col-recibe">${quienRecibe}</td>
             </tr>`;
+
+            const precioMovilHtml = esTecnico ? "" : ` &nbsp;|&nbsp; Precio: ${formatoMoneda(precioVenta)}`;
 
             tarjetasMovilHtml += `
             <div class="salida-card">
                 <div class="salida-desc">${descripcion}</div>
                 <div class="salida-codigo-badge">${salida.codigo ?? ""}</div>
-                <div class="salida-sub">Cant: ${cantidadNum} &nbsp;|&nbsp; Precio: ${formatoMoneda(precioVenta)}</div>
+                <div class="salida-sub">Cant: ${cantidadNum}${precioMovilHtml}</div>
                 <div class="salida-footer">
                     <span>📅 ${fechaFormateada} - ${horaFormateada}</span>
                     <span>👤 ${quienRecibe}</span>
@@ -116,7 +156,8 @@ function renderizarBuses(datosBuses) {
         });
 
         if (salidasDelBus.length === 0) {
-            tablaSalidasHtml = `<tr><td colspan="7" style="text-align:center; color:#284B87; font-weight:bold; padding:15px;">Sin salidas registradas para este bus</td></tr>`;
+            const totalColumnas = esTecnico ? 6 : 7;
+            tablaSalidasHtml = `<tr><td colspan="${totalColumnas}" style="text-align:center; color:#284B87; font-weight:bold; padding:15px;">Sin salidas registradas para este bus</td></tr>`;
             tarjetasMovilHtml = `<div style="text-align:center; color:#284B87; font-weight:bold; padding:10px; font-size:13px;">Sin salidas registradas para este bus</div>`;
         }
 
@@ -133,18 +174,26 @@ function renderizarBuses(datosBuses) {
         const btnEstilo = esFacturado ? "background:#10b981; cursor:not-allowed;" : "";
         const btnDeshabilitado = esFacturado ? "disabled" : "";
 
-        // Escapar comillas simples para evitar roturas de sintaxis en el HTML inline
         const nombreEscapado = (vehiculo.bus ?? "Bus sin nombre").replace(/'/g, "\\'");
         const placaEscapada = (vehiculo.placa ?? "---").replace(/'/g, "\\'");
 
+        const textoTotalCabecera = esTecnico ? "" : ` &nbsp;|&nbsp; Total: ${formatoMoneda(totalAcumulado)}`;
+
+        const thPrecioHtml = esTecnico ? "" : `<th style="text-align:right;">P VENTA</th>`;
+
+        const btnFacturarHtml = esTecnico ? "" : `
+        <div class="panel-acciones">
+            <button class="btn-facturar" style="${btnEstilo}" ${btnDeshabilitado} id="btn-fac-${vehiculo.id}" onclick="event.stopPropagation(); prepararYRedireccionarFacturacion('${vehiculo.id}', '${nombreEscapado}', '${placaEscapada}')">${btnTexto}</button>
+        </div>`;
+
         html += `
-        <div class="bus-item" id="bus-${vehiculo.id}">
-            <div class="bus-header" onclick="toggleAcordeonBuses('bus-${vehiculo.id}')">
+        <div class="bus-item" id="bus-${vehiculo.id}" data-bus-id="${vehiculo.id}">
+            <div class="bus-header" data-bus-id="${vehiculo.id}">
                 <div class="bus-foto-wrapper" onclick="event.stopPropagation(); abrirVisorImagen('${vehiculo.foto}')">${imgHtml}</div>
                 <div class="bus-info-main">
                     <div class="bus-titulo">${vehiculo.bus ?? "Bus sin nombre"}</div>
                     <div class="bus-detalles-linea1">Placa: ${vehiculo.placa ?? "---"} &nbsp;|&nbsp; Cliente: ${vehiculo.cliente ?? "---"}</div>
-                    <div class="bus-detalles-linea2">Salidas: ${salidasDelBus.length} &nbsp;|&nbsp; Total: ${formatoMoneda(totalAcumulado)}</div>
+                    <div class="bus-detalles-linea2">Salidas: ${salidasDelBus.length}${textoTotalCabecera}</div>
                 </div>
                 <div class="bus-flecha">▼</div>
             </div>
@@ -153,23 +202,54 @@ function renderizarBuses(datosBuses) {
                     <table>
                         <thead>
                             <tr>
-                                <th>FECHA</th><th>HORA</th><th>CODIGO</th><th>DESCRIPCION</th><th style="text-align:center;">CANT</th><th style="text-align:right;">P VENTA</th><th>RECIBE</th>
+                                <th>FECHA</th><th>HORA</th><th>CODIGO</th><th>DESCRIPCION</th><th style="text-align:center;">CANT</th>${thPrecioHtml}<th>RECIBE</th>
                             </tr>
                         </thead>
                         <tbody>${tablaSalidasHtml}</tbody>
                     </table>
                 </div>
                 <div class="mobile-cards-salidas">${tarjetasMovilHtml}</div>
-                <div class="panel-acciones">
-                    <button class="btn-facturar" style="${btnEstilo}" ${btnDeshabilitado} id="btn-fac-${vehiculo.id}" onclick="event.stopPropagation(); abrirPasarelaFacturacion('${vehiculo.id}', '${nombreEscapado}', '${placaEscapada}')">${btnTexto}</button>
-                </div>
+                ${btnFacturarHtml}
             </div>
         </div>`;
     });
 
     contenedor.innerHTML = html;
+    bindClickHandlers();
 }
 
+// ═══════════════════════════════════════════════════════════
+//  BIND: DETECTAR SINGLE VS DOUBLE CLICK
+// ═══════════════════════════════════════════════════════════
+function bindClickHandlers() {
+    document.querySelectorAll('.bus-header').forEach(header => {
+        header.addEventListener('click', handleBusClick);
+    });
+}
+
+function handleBusClick(e) {
+    const idBus = e.currentTarget.dataset.busId;
+    if (!idBus) return;
+
+    // Si es doble clic, detener el acordeón
+    if (clickTimer !== null) {
+        clearTimeout(clickTimer);
+        clickTimer = null;
+        // Es un doble clic, NO hacer nada aquí
+        return;
+    }
+
+    // Es un clic simple, programar posible doble clic
+    clickTimer = setTimeout(() => {
+        // Pasó el tiempo de tolerancia sin otro clic → es un clic simple
+        toggleAcordeonBuses(`bus-${idBus}`);
+        clickTimer = null;
+    }, 300); // 300ms de tolerancia para detectar doble clic
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TOGGLE ACORDEÓN
+// ═══════════════════════════════════════════════════════════
 function toggleAcordeonBuses(idElemento) {
     const itemActual = document.getElementById(idElemento);
     if (!itemActual) return;
@@ -179,78 +259,9 @@ function toggleAcordeonBuses(idElemento) {
     if (!estaAbierto) itemActual.classList.add("abierto");
 }
 
-/* ==========================================================================
-   🚀 CANALES DE FACTURACIÓN (LLAMADOS DESDE LA PASARELA INTERACTIVA DEL HTML)
-   ========================================================================== */
-
-// Opción A: Facturación Electrónica Oficial Siigo
-async function lanzarFacturacionSiigo(id, infoBus) {
-    const boton = document.getElementById(`btn-fac-${id}`);
-    if (!boton) return;
-
-    try {
-        boton.disabled = true;
-        boton.innerText = "Procesando Siigo...";
-        boton.style.background = "#4b5563";
-
-        // Llamada directa a tu Edge Function en Supabase
-        const { data, error } = await supabaseClient.functions.invoke('facturar-siigo', {
-            body: { busId: id }
-        });
-
-        if (error) throw error;
-
-        alert(`¡Factura generada con éxito en Siigo para el bus ${infoBus.nombre}!`);
-        boton.innerText = "Facturado (Siigo) ✓";
-        boton.style.background = "#10b981";
-        
-        const bus = listaBuses.find(b => b.id === id);
-        if (bus) bus.estado = "FACTURADO";
-
-    } catch (err) {
-        console.error("Error en facturación Siigo:", err);
-        alert(`No se pudo completar la facturación en Siigo: ${err.message || err}`);
-        boton.disabled = false;
-        boton.innerText = "Facturar";
-        boton.style.background = "#284B87";
-    }
-}
-
-// Opción B: Facturación / Remisión Interna Local
-async function lanzarFacturacionInterna(id, infoBus) {
-    const boton = document.getElementById(`btn-fac-${id}`);
-    if (!boton) return;
-
-    try {
-        boton.disabled = true;
-        boton.innerText = "Guardando Interno...";
-        boton.style.background = "#4b5563";
-
-        // Actualizamos el estado directamente en la tabla 'buses' en Supabase como 'FACTURADO_INTERNO'
-        const { error } = await supabaseClient
-            .from("buses")
-            .update({ estado: "FACTURADO_INTERNO" })
-            .eq("id", id);
-
-        if (error) throw error;
-
-        alert(`¡Remisión interna registrada con éxito para el bus ${infoBus.nombre}!`);
-        boton.innerText = "Facturado (Interno) ✓";
-        boton.style.background = "#10b981";
-        
-        const bus = listaBuses.find(b => b.id === id);
-        if (bus) bus.estado = "FACTURADO_INTERNO";
-
-    } catch (err) {
-        console.error("Error en facturación interna:", err);
-        alert(`No se pudo registrar la remisión interna: ${err.message || err}`);
-        boton.disabled = false;
-        boton.innerText = "Facturar";
-        boton.style.background = "#284B87";
-    }
-}
-
-// Búsqueda en tiempo real
+// ═══════════════════════════════════════════════════════════
+//  BÚSQUEDA EN TIEMPO REAL
+// ═══════════════════════════════════════════════════════════
 document.getElementById("txtBuscar").addEventListener("input", function () {
     clearTimeout(timeoutBusqueda);
     const texto = this.value.trim().toUpperCase();
@@ -268,7 +279,319 @@ document.getElementById("txtBuscar").addEventListener("input", function () {
     }, 100);
 });
 
-// Inicializadores de interfaz y carga del documento
+// ═══════════════════════════════════════════════════════════
+//  PREPARAR FACTURACIÓN
+// ═══════════════════════════════════════════════════════════
+function prepararYRedireccionarFacturacion(idBus, nombreBus, placaBus) {
+    try {
+        const vehiculo = listaBuses.find(b => b.id === idBus);
+        if (!vehiculo) return;
+
+        const salidasDelBus = listaSalidas.filter(s => String(s.bus) === String(idBus) || String(s.bus) === String(vehiculo.bus));
+
+        const itemsMapeados = salidasDelBus.map(salida => {
+            const prodReferencia = mapaProductos.get(salida.codigo);
+            return {
+                codigo: salida.codigo || 'GENERICO',
+                descripcion: prodReferencia ? prodReferencia.descripcion : 'Servicio / Mano de obra',
+                cantidad: parseFloat(salida.cantidad) || 1,
+                precio_unitario: prodReferencia ? parseFloat(prodReferencia.precio_venta) : 0,
+                descuento: 0,
+                tipo: (salida.codigo && salida.codigo.startsWith('SR')) ? 'SERVICIO' : 'PRODUCTO'
+            };
+        });
+
+        const datosFacturacion = {
+            cliente: {
+                nombre: vehiculo.cliente || '',
+                id: '', 
+                direccion: '',
+                Ciudad: '',
+                telefono: ''
+            },
+            placa: placaBus,
+            busNo: nombreBus,
+            items: itemsMapeados,
+            manoObraGlobal: 0
+        };
+
+        localStorage.setItem('datosBusPrecarga', JSON.stringify(datosFacturacion));
+        window.location.href = "facturas_ventas.html";
+
+    } catch (err) {
+        console.error("Error al preparar los datos de facturación:", err);
+        mostrarToast('Error al transferir datos del bus', 'err');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  MENÚ CONTEXTUAL DOBLE CLIC
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('dblclick', (e) => {
+    const busHeader = e.target.closest('.bus-header');
+    if (!busHeader) return;
+
+    const idBus = busHeader.dataset.busId;
+    if (!idBus) return;
+
+    // Buscar el bus en la lista
+    busEnContexto = listaBuses.find(b => b.id === idBus);
+    if (!busEnContexto) return;
+
+    // Mostrar menú contextual
+    abrirMenuContextual(e);
+});
+
+function abrirMenuContextual(e) {
+    const menu = document.getElementById('menuContextual');
+    if (!menu) return;
+
+    let x = e.clientX ?? 0;
+    let y = e.clientY ?? 0;
+
+    const mw = 200, mh = 80;
+    x = Math.max(10, Math.min(x, window.innerWidth - mw - 10));
+    y = Math.max(10, Math.min(y, window.innerHeight - mh - 10));
+
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+    menu.classList.add('visible');
+
+    if (navigator.vibrate) navigator.vibrate(20);
+}
+
+function ocultarMenuContextual() {
+    const menu = document.getElementById('menuContextual');
+    if (menu) menu.classList.remove('visible');
+}
+
+// Cerrar menú al hacer clic fuera
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('menuContextual');
+    if (menu && menu.classList.contains('visible') && !menu.contains(e.target)) {
+        ocultarMenuContextual();
+    }
+});
+
+// ═══════════════════════════════════════════════════════════
+//  EDITAR BUS
+// ═══════════════════════════════════════════════════════════
+function editarBusDesdeMenu() {
+    ocultarMenuContextual();
+    if (!busEnContexto) return;
+    
+    abrirSheetEdicion(busEnContexto);
+}
+
+function abrirSheetEdicion(bus) {
+    fotoEditarFile = null;
+
+    // Llenar inputs con datos actuales
+    document.getElementById('editBus').value = bus.bus || '';
+    document.getElementById('editPlaca').value = bus.placa || '';
+    document.getElementById('editCliente').value = bus.cliente || '';
+
+    // Mostrar foto si existe
+    const previewBox = document.getElementById('previewEditFoto');
+    const iconCamara = document.getElementById('iconEditCamara');
+    
+    previewBox.innerHTML = '';
+    if (bus.foto) {
+        previewBox.innerHTML = `<img src="${bus.foto}" alt="Bus">`;
+        if (iconCamara) iconCamara.style.display = 'none';
+    } else {
+        previewBox.appendChild(iconCamara || document.createElement('span'));
+        if (iconCamara) iconCamara.style.display = 'block';
+    }
+
+    document.getElementById('sheetTitulo').textContent = 'Editar Bus';
+    document.getElementById('overlaySheet').classList.add('visible');
+    setTimeout(() => document.getElementById('hojaSheet').classList.add('visible'), 10);
+}
+
+function cerrarSheetEdicion() {
+    document.getElementById('hojaSheet').classList.remove('visible');
+    document.getElementById('overlaySheet').classList.remove('visible');
+    fotoEditarFile = null;
+    busEnContexto = null;
+}
+
+// Manejo del cambio de foto
+document.getElementById('editFoto').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    fotoEditarFile = file;
+    const previewBox = document.getElementById('previewEditFoto');
+    const iconCamara = document.getElementById('iconEditCamara');
+    
+    previewBox.innerHTML = '';
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+        previewBox.innerHTML = `<img src="${evt.target.result}" alt="Preview">`;
+    };
+    reader.readAsDataURL(file);
+    if (iconCamara) iconCamara.style.display = 'none';
+});
+
+// Guardar cambios del bus
+document.getElementById('btnConfirmarEdicion').addEventListener('click', async () => {
+    if (!busEnContexto) return;
+
+    const nombreNuevo = document.getElementById('editBus').value.trim();
+    const placaNueva = document.getElementById('editPlaca').value.trim().toUpperCase();
+    const clienteNuevo = document.getElementById('editCliente').value.trim();
+
+    if (!nombreNuevo || !placaNueva) {
+        mostrarToast('Completa los campos obligatorios', 'err');
+        return;
+    }
+
+    const btn = document.getElementById('btnConfirmarEdicion');
+    btn.disabled = true;
+    btn.textContent = 'Guardando…';
+
+    try {
+        let fotoUrl = busEnContexto.foto;
+
+        // Si hay foto nueva, subirla
+        if (fotoEditarFile) {
+            const fileExt = fotoEditarFile.name.split('.').pop();
+            const fileName = `${busEnContexto.id}_${placaNueva}.${fileExt}`;
+
+            await supabaseClient.storage.from('buses').upload(fileName, fotoEditarFile, { upsert: true });
+            const { data: urlData } = supabaseClient.storage.from('buses').getPublicUrl(fileName);
+            fotoUrl = urlData?.publicUrl || busEnContexto.foto;
+        }
+
+        // Actualizar en Supabase
+        const { error } = await supabaseClient
+            .from('buses')
+            .update({
+                bus: nombreNuevo,
+                placa: placaNueva,
+                cliente: clienteNuevo,
+                foto: fotoUrl
+            })
+            .eq('id', busEnContexto.id);
+
+        if (error) throw error;
+
+        // Actualizar localmente
+        const busLocal = listaBuses.find(b => b.id === busEnContexto.id);
+        if (busLocal) {
+            busLocal.bus = nombreNuevo;
+            busLocal.placa = placaNueva;
+            busLocal.cliente = clienteNuevo;
+            busLocal.foto = fotoUrl;
+        }
+
+        cerrarSheetEdicion();
+        renderizarBuses(listaBuses);
+        mostrarToast('Bus actualizado correctamente', 'ok');
+
+    } catch (err) {
+        console.error('Error guardando:', err);
+        mostrarToast('Error al guardar: ' + (err.message || 'Error desconocido'), 'err');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Guardar cambios';
+    }
+});
+
+// ═══════════════════════════════════════════════════════════
+//  ELIMINAR BUS
+// ═══════════════════════════════════════════════════════════
+function eliminarBusDesdeMenu() {
+    ocultarMenuContextual();
+    if (!busEnContexto) return;
+
+    confirmarEliminacionUI(`¿Eliminar el bus "${busEnContexto.bus}"? No se pueden recuperar los datos después.`).then(async (verificado) => {
+        if (!verificado) return;
+
+        try {
+            // Eliminar en Supabase
+            const { error } = await supabaseClient
+                .from('buses')
+                .delete()
+                .eq('id', busEnContexto.id);
+
+            if (error) throw error;
+
+            // Actualizar localmente
+            listaBuses = listaBuses.filter(b => b.id !== busEnContexto.id);
+            
+            renderizarBuses(listaBuses);
+            mostrarToast('Bus eliminado correctamente', 'ok');
+
+        } catch (err) {
+            console.error('Error eliminando:', err);
+            mostrarToast('Error al eliminar: ' + (err.message || 'Error desconocido'), 'err');
+        }
+
+        busEnContexto = null;
+    });
+}
+
+// Modal personalizado de confirmación
+function confirmarEliminacionUI(mensaje) {
+    return new Promise((resolve) => {
+        let modal = document.getElementById('modalConfirmarEliminar');
+        
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'modalConfirmarEliminar';
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+                background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px);
+                display: flex; align-items: center; justify-content: center;
+                z-index: 9999; opacity: 0; pointer-events: none; transition: opacity .2s ease;
+            `;
+            modal.innerHTML = `
+                <div style="background: white; border-radius: 12px; padding: 20px 24px; max-width: 360px; width: 90%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+                    <h4 style="margin: 0 0 8px 0; color: #0f172a; font-size: 16px;">¿Eliminar bus?</h4>
+                    <p id="msgConfirmarEliminar" style="margin: 0 0 20px 0; color: #64748b; font-size: 14px; line-height: 1.4;"></p>
+                    <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                        <button id="btnCancelDel" style="padding: 8px 14px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; color: #475569; font-weight: 600; cursor: pointer;">Cancelar</button>
+                        <button id="btnOkDel" style="padding: 8px 14px; border-radius: 6px; border: none; background: #ef4444; color: white; font-weight: 600; cursor: pointer;">Eliminar</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        document.getElementById('msgConfirmarEliminar').innerText = mensaje;
+        modal.style.opacity = '1';
+        modal.style.pointerEvents = 'auto';
+
+        const btnOk = document.getElementById('btnOkDel');
+        const btnCancel = document.getElementById('btnCancelDel');
+
+        const cerrar = (resultado) => {
+            modal.style.opacity = '0';
+            modal.style.pointerEvents = 'none';
+            btnOk.onclick = null;
+            btnCancel.onclick = null;
+            resolve(resultado);
+        };
+
+        btnOk.onclick = () => cerrar(true);
+        btnCancel.onclick = () => cerrar(false);
+    });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CERRAR SHEET
+// ═══════════════════════════════════════════════════════════
+document.getElementById('overlaySheet').addEventListener('click', (e) => {
+    if (e.target.id === 'overlaySheet') cerrarSheetEdicion();
+});
+
+document.getElementById('sheetHandle').addEventListener('click', cerrarSheetEdicion);
+
+// ═══════════════════════════════════════════════════════════
+//  INICIALIZADORES DEL DOCUMENTO
+// ═══════════════════════════════════════════════════════════
 document.addEventListener("DOMContentLoaded", () => {
     const btnAbrirFlotante = document.getElementById('btnAbrirFlotante');
     const overlayFlotante = document.getElementById('overlayFlotante');
@@ -360,8 +683,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (busInsertado) busInsertado.foto = publicUrl;
                 }
 
+                mostrarToast('Bus creado exitosamente', 'ok');
+
             } catch (err) {
                 console.error("Error asíncrono de guardado remoto:", err);
+                mostrarToast('Error al guardar el bus remotamente', 'err');
             }
         });
     }
