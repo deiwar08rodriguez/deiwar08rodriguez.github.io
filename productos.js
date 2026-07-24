@@ -830,35 +830,90 @@ document.getElementById("btnGuardarAdd").addEventListener("click", async functio
     const subcategoria = document.getElementById("addSubcategoria").value.trim();
     const descripcion = document.getElementById("addDescripcion").value.trim();
 
-    if (!categoria) { alert("Seleccione o escriba la categoría."); document.getElementById("addCategoria").focus(); return; }
-    if (!subcategoria) { alert("Seleccione o escriba la subcategoría."); document.getElementById("addSubcategoria").focus(); return; }
-    if (!descripcion) { alert("Ingrese la descripción."); document.getElementById("addDescripcion").focus(); return; }
+    if (!categoria) { 
+        mostrarToast("Seleccione o escriba la categoría."); 
+        document.getElementById("addCategoria").focus(); 
+        return; 
+    }
+    if (!subcategoria) { 
+        mostrarToast("Seleccione o escriba la subcategoría."); 
+        document.getElementById("addSubcategoria").focus(); 
+        return; 
+    }
+    if (!descripcion) { 
+        mostrarToast("Ingrese la descripción del producto."); 
+        document.getElementById("addDescripcion").focus(); 
+        return; 
+    }
 
     const categoriaNorm = normalizarBusqueda(categoria);
     if (esCategoriaEspecial(categoriaNorm)) {
         const codTamano = obtenerCodigoTamanoSeleccionado();
-        if (!codTamano) { alert("Seleccione el tamaño (pulgada)."); return; }
+        if (!codTamano) { 
+            mostrarToast("Seleccione el tamaño (pulgada)."); 
+            return; 
+        }
         if (requiereMedidaMetrica(normalizarBusqueda(subcategoria))) {
             const medida = document.getElementById("addMedidaMetrica").value.trim();
-            if (!medida) { alert("Ingrese la medida métrica."); document.getElementById("addMedidaMetrica").focus(); return; }
+            if (!medida) { 
+                mostrarToast("Ingrese la medida métrica."); 
+                document.getElementById("addMedidaMetrica").focus(); 
+                return; 
+            }
         }
     }
 
+    // 1. VALIDACIÓN OBLIGATORIA DE PRECIO DE VENTA (Exigido por Siigo)
+    const precioVenta = limpiarPrecioTexto(document.getElementById("addPrecioVenta").value);
+    if (!precioVenta || precioVenta <= 0) {
+        mostrarToast("El precio de venta es obligatorio y debe ser mayor a $0.");
+        document.getElementById("addPrecioVenta").focus();
+        return;
+    }
+
+    const precioCompra = limpiarPrecioTexto(document.getElementById("addPrecioCompra").value);
+    const stockInicial = Number(document.getElementById("addStockInicial").value || 0);
+    const proveedor = document.getElementById("addProveedor").value.trim();
+    const codigoProv = document.getElementById("addCodigoProv").value.trim();
+    const fechaActual = new Date().toISOString().split('T')[0];
+
     const btnGuardar = this;
     btnGuardar.disabled = true;
-    btnGuardar.innerText = "Creando...";
 
     try {
         const codigo = await generarCodigoFinal(categoria, subcategoria);
 
-        const precioCompra = limpiarPrecioTexto(document.getElementById("addPrecioCompra").value);
-        const precioVenta = limpiarPrecioTexto(document.getElementById("addPrecioVenta").value);
-        const stockInicial = Number(document.getElementById("addStockInicial").value || 0);
-        const proveedor = document.getElementById("addProveedor").value.trim();
-        const codigoProv = document.getElementById("addCodigoProv").value.trim();
-        const fechaActual = new Date().toISOString().split('T')[0];
+        // 2. PASO 1: SINCRONIZAR PRIMERO CON SIIGO
+        btnGuardar.innerText = "Sincronizando con Siigo...";
+        
+        const respuestaSiigo = await fetch('https://vdlxmajvzdtbewchyowm.supabase.co/functions/v1/smart-endpoint', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'create', // Busca un inactivo en Siigo y lo recicla / crea
+                code: codigo,     
+                name: descripcion,                      
+                price: precioVenta                    
+            })
+        });
 
-        const { error } = await supabaseClient
+        if (!respuestaSiigo.ok) {
+            const textoError = await respuestaSiigo.text();
+            throw new Error(`Error en servidor Siigo (${respuestaSiigo.status}): ${textoError}`);
+        }
+
+        const resultadoSiigo = await respuestaSiigo.json();
+
+        if (!resultadoSiigo.success) {
+            throw new Error(resultadoSiigo.error || "Siigo rechazó la creación del producto.");
+        }
+
+        const siigoId = resultadoSiigo.siigo_id || null;
+
+        // 3. PASO 2: GUARDAR EN SUPABASE SOLO SI SIIGO FUE EXITOSO
+        btnGuardar.innerText = "Guardando en base de datos...";
+
+        const { error: errInsert } = await supabaseClient
             .from("productos")
             .insert([{
                 codigo: codigo,
@@ -870,52 +925,15 @@ document.getElementById("btnGuardarAdd").addEventListener("click", async functio
                 precio_compra: precioCompra,
                 precio_venta: precioVenta,
                 stock: stockInicial,
-                fecha_precio: precioCompra > 0 ? fechaActual : null
+                fecha_precio: precioCompra > 0 ? fechaActual : null,
+                siigo_id: siigoId
             }]);
 
-if (error) throw new Error(`Error insertando producto nuevo: ${error.message}`);
-
-        // NUEVO: SINCRONIZACIÓN Y RECICLAJE EN SIIGO
-        btnGuardar.innerText = "Sincronizando con Siigo...";
-        
-        try {
-            const respuestaSiigo = await fetch('https://vdlxmajvzdtbewchyowm.supabase.co/functions/v1/smart-endpoint', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'create', // Busca un inactivo en Siigo y lo recicla
-                    code: codigo,     
-                    name: descripcion,                      
-                    price: precioVenta                    
-                })
-            });
-
-            if (!respuestaSiigo.ok) {
-                const textoError = await respuestaSiigo.text();
-                throw new Error(`Servidor Supabase (Edge): ${respuestaSiigo.status} - ${textoError}`);
-            }
-
-            const resultadoSiigo = await respuestaSiigo.json();
-
-            if (!resultadoSiigo.success) {
-                throw new Error(resultadoSiigo.error || "Error interno de Siigo sin mensaje.");
-            }
-
-            // Si el reciclaje fue exitoso, guardamos ese siigo_id en Supabase para amarrarlos
-            if (resultadoSiigo.siigo_id) {
-                await supabaseClient
-                    .from("productos")
-                    .update({ siigo_id: resultadoSiigo.siigo_id })
-                    .eq("codigo", codigo);
-            }
-
-        } catch (errorSiigo) {
-            console.error("Error de Siigo en adición:", errorSiigo);
-            alert("¡Atención!: El producto se guardó en Supabase localmente, pero falló el reciclaje/activación en Siigo: " + errorSiigo.message);
+        if (errInsert) {
+            throw new Error(`Creado en Siigo (ID: ${siigoId}), pero falló en base de datos: ${errInsert.message}`);
         }
 
         await cargarProductos();
-
         mostrarResultado(codigo, descripcion);
 
         const mantenerVarios = document.getElementById("chkAgregarVarios").checked;
@@ -924,13 +942,71 @@ if (error) throw new Error(`Error insertando producto nuevo: ${error.message}`);
         }
 
     } catch (err) {
-        console.error("Error creando producto:", err);
-        alert("Error al crear el producto: " + err.message);
+        console.error("Error en proceso de creación:", err);
+        mostrarToast(err.message || "Error al procesar la solicitud.");
     } finally {
         btnGuardar.disabled = false;
         btnGuardar.innerText = "Crear Producto";
     }
 });
+
+function mostrarToast(mensaje, tipo = "error") {
+    // Definir o reusar el contenedor de toasts
+    let contenedor = document.getElementById("toastContainer");
+    if (!contenedor) {
+        contenedor = document.createElement("div");
+        contenedor.id = "toastContainer";
+        // Estilos del contenedor fijo
+        Object.assign(contenedor.style, {
+            position: "fixed",
+            bottom: "20px",
+            right: "20px",
+            zIndex: "99999",
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px"
+        });
+        document.body.appendChild(contenedor);
+    }
+
+    // Crear la tarjeta de notificación
+    const toast = document.createElement("div");
+    toast.innerText = mensaje;
+
+    // Colores según el tipo
+    const esError = tipo === "error";
+    const bg = esError ? "#DC2626" : "#16A34A"; // Rojo para error, verde para éxito
+
+    Object.assign(toast.style, {
+        backgroundColor: bg,
+        color: "#FFFFFF",
+        padding: "12px 18px",
+        borderRadius: "8px",
+        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)",
+        fontSize: "14px",
+        fontWeight: "500",
+        minWidth: "250px",
+        maxWidth: "380px",
+        opacity: "0",
+        transform: "translateY(10px)",
+        transition: "all 0.3s ease"
+    });
+
+    contenedor.appendChild(toast);
+
+    // Animación de entrada
+    requestAnimationFrame(() => {
+        toast.style.opacity = "1";
+        toast.style.transform = "translateY(0)";
+    });
+
+    // Auto-eliminar después de 3.5 segundos
+    setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateY(10px)";
+        setTimeout(() => toast.remove(), 300);
+    }, 3500);
+}
 
 // ===================== MODAL RESULTADO =====================
 
