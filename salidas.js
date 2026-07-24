@@ -37,7 +37,13 @@ async function cargarProductos() {
 }
 
 async function cargarBuses() {
-    const { data, error } = await sb.from('buses').select('id, bus, placa').order('placa');
+    // Agregamos .eq('estado', 'ABIERTO') para filtrar desde la BD
+    const { data, error } = await sb
+        .from('buses')
+        .select('id, bus, placa, estado')
+        .eq('estado', 'ABIERTO') // <--- Filtro agregado
+        .order('placa');
+
     if (error) { 
         console.error('Error cargando buses:', error); 
         mostrarToast('Error al cargar buses', 'err');
