@@ -149,7 +149,6 @@ function etiquetaFecha(fechaStr) {
     return d.toLocaleDateString('es-CO', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
 }
 
-// ── Vista PC ──
 function renderPC(grupos) {
     const tbody = document.getElementById('tablaBody');
     tbody.innerHTML = '';
@@ -174,8 +173,13 @@ function renderPC(grupos) {
             const tr = document.createElement('tr');
             tr.dataset.id = s.id;
             tr.style.cursor = 'pointer'; // Feedback visual
+
+            // Si s.codigo existe en el catálogo se muestra; si es texto libre, la columna queda vacía
+            const esCatalogo = todosProductos.some(p => p.codigo === s.codigo);
+            const codigoAMostrar = esCatalogo ? s.codigo : '';
+
             tr.innerHTML = `
-                <td class="col-codigo">${s.codigo || ''}</td>
+                <td class="col-codigo">${codigoAMostrar}</td>
                 <td class="col-desc">${descripcionDeCodigo(s.codigo)}</td>
                 <td class="col-cant">${formatCant(s.cantidad)}</td>
                 <td class="col-hora">${s.hora || ''}</td>
@@ -216,11 +220,16 @@ function renderMobile(grupos) {
             card.dataset.id = s.id;
 
             const esT = s.tipo === 'T';
+
+            // Si es catálogo muestra el subcódigo abajo; si es texto libre no renderiza la línea secundaria
+            const esCatalogo = todosProductos.some(p => p.codigo === s.codigo);
+            const subcodigo = esCatalogo ? s.codigo : '';
+
             card.innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
                     <div style="flex:1;">
                         <div style="font-weight:bold;color:#203764;margin-bottom:4px;">${descripcionDeCodigo(s.codigo)}</div>
-                        <div style="font-size:12px;color:#64748b;margin-bottom:6px;">${s.codigo || ''}</div>
+                        ${subcodigo ? `<div style="font-size:12px;color:#64748b;margin-bottom:6px;">${subcodigo}</div>` : ''}
                         <div style="font-size:12px;color:#64748b;">${s.recibe || '—'} ${s.hora ? '· ' + s.hora : ''}</div>
                     </div>
                     <div style="text-align:right;">
@@ -249,7 +258,7 @@ function bindUI() {
 
     // FAB
     document.getElementById('btnNuevaSalida').addEventListener('click', () => abrirSheet());
-
++
     // Cerrar sheet
     document.getElementById('overlaySheet').addEventListener('click', cerrarSheet);
     document.getElementById('sheetHandle').addEventListener('click', cerrarSheet);
@@ -391,8 +400,10 @@ function buscarProductoDropdown(texto) {
 let editIndex = null; 
 
 function agregarItemPendiente() {
-    if (!productoSeleccionado) {
-        mostrarToast('Selecciona un producto válido del listado', 'err');
+    const textoInput = document.getElementById('inputProducto').value.trim();
+    
+    if (!textoInput) {
+        mostrarToast('Ingresa un producto o descripción', 'err');
         return;
     }
 
@@ -402,23 +413,26 @@ function agregarItemPendiente() {
         return;
     }
 
+    // Si hay producto seleccionado guardamos su código real, si no, guardamos el texto libre directamente
+    const codigoItem = productoSeleccionado ? productoSeleccionado.codigo : textoInput;
+    const descItem   = productoSeleccionado ? productoSeleccionado.descripcion : textoInput;
+
     if (editIndex !== null) {
-        // Modo Edición: Actualizar la fila seleccionada
         itemsPendientes[editIndex] = {
-            codigo:      productoSeleccionado.codigo,
-            descripcion: productoSeleccionado.descripcion,
+            codigo:      codigoItem,
+            descripcion: descItem,
             cantidad:    cantInput
         };
-        editIndex = null; // Limpiar modo edición
+        editIndex = null;
     } else {
-        // Modo Creación: Verificar si ya existe en la lista para sumar o agregar
-        const existente = itemsPendientes.find(i => i.codigo === productoSeleccionado.codigo);
+        const existente = itemsPendientes.find(i => i.codigo === codigoItem);
+        
         if (existente) {
             existente.cantidad += cantInput;
         } else {
             itemsPendientes.push({
-                codigo:      productoSeleccionado.codigo,
-                descripcion: productoSeleccionado.descripcion,
+                codigo:      codigoItem,
+                descripcion: descItem,
                 cantidad:    cantInput,
             });
         }
@@ -432,17 +446,19 @@ function cargarItemParaEditar(idx) {
     const item = itemsPendientes[idx];
     if (!item) return;
 
-    // Asignar productoSeleccionado para que el botón de agregar/guardar lo reconozca
-    productoSeleccionado = {
-        codigo: item.codigo,
-        descripcion: item.descripcion
-    };
+    // Verificar si el código corresponde a un producto registrado en el catálogo
+    const prodCatalogo = todosProductos.find(p => p.codigo === item.codigo);
 
-    // Llenar los inputs del formulario
-    document.getElementById('inputProducto').value = `${item.codigo} - ${item.descripcion}`;
+    if (prodCatalogo) {
+        productoSeleccionado = prodCatalogo;
+        document.getElementById('inputProducto').value = `${prodCatalogo.codigo} - ${prodCatalogo.descripcion}`;
+    } else {
+        // Producto genérico o texto libre
+        productoSeleccionado = null;
+        document.getElementById('inputProducto').value = item.codigo; // Muestra el texto guardado
+    }
+
     document.getElementById('inputCantidad').value = item.cantidad;
-
-    // Guardar el índice que estamos editando
     editIndex = idx;
 }
 
@@ -536,14 +552,15 @@ async function confirmarSalidas() {
     const tipo = modoActual;
 
     try {
-        // ── SI ES UNA EDICIÓN: Limpiar registro previo y restaurar su stock ──
+        // ── SI ES UNA EDICIÓN: Revertir stock previo y borrar registro antiguo ──
         if (salidaEdicionOriginal) {
             const cantOrig = parseFloat(salidaEdicionOriginal.cantidad) || 0;
             
-            // 1. Revertir stock del producto original
-            await ajustarStock(salidaEdicionOriginal.codigo, cantOrig);
+            // Revertir stock únicamente si el código existía en el catálogo de productos
+            if (salidaEdicionOriginal.codigo) {
+                await ajustarStock(salidaEdicionOriginal.codigo, cantOrig);
+            }
 
-            // 2. Eliminar la salida antigua en Supabase
             const { error: errDelete } = await sb
                 .from('salidas')
                 .delete()
@@ -552,14 +569,12 @@ async function confirmarSalidas() {
             if (errDelete) throw errDelete;
         }
 
-        // ── GUARDAR ITEMS FINALES (Nuevos o Modificados) ──
-        let conteoGuardadas = 0;
-
+        // ── GUARDAR ITEMS FINALES ──
         for (const item of itemsPendientes) {
-            // Insertar salida en Supabase
+            // Insertar salida sin columna 'descripcion'
             const { error: errInsert } = await sb.from('salidas').insert({
                 fecha:    hoy,
-                codigo:   item.codigo,
+                codigo:   item.codigo, // Guarda el código del catálogo o el texto libre
                 cantidad: String(item.cantidad),
                 hora:     hora,
                 recibe:   recibe,
@@ -569,15 +584,17 @@ async function confirmarSalidas() {
 
             if (errInsert) throw errInsert;
 
-            // Descontar nuevo stock
-            await ajustarStock(item.codigo, -item.cantidad);
-            conteoGuardadas++;
+            // Ajustar stock solo si el código existe en el catálogo de productos
+            const esProductoCatalogo = todosProductos.some(p => p.codigo === item.codigo);
+            if (esProductoCatalogo) {
+                await ajustarStock(item.codigo, -item.cantidad);
+            }
         }
 
-        salidaEdicionOriginal = null; // Resetear estado de edición
+        salidaEdicionOriginal = null;
         cerrarSheet();
         await cargarSalidas();
-        await cargarProductos(); // Refrescar stocks locales
+        await cargarProductos();
         
         renderizarTodo(document.getElementById('txtBuscar')?.value || '');
         mostrarToast('Cambios guardados correctamente', 'ok');
@@ -593,7 +610,8 @@ async function confirmarSalidas() {
 
 //  STOCK
 async function ajustarStock(codigo, delta) {
-    // Solo ajustar si el producto tiene stock numérico (no null)
+    if (!codigo) return; // Si no hay código (producto genérico), no se ajusta stock
+
     const prod = todosProductos.find(p => p.codigo === codigo);
     if (!prod) return;
     if (prod.stock === null || prod.stock === undefined) return;
@@ -713,8 +731,11 @@ async function eliminarSalidaDesdeMenu() {
     const s = salidaEnContexto;
     const cant = parseFloat(s.cantidad) || 0;
     const desc = descripcionDeCodigo(s.codigo);
+    const esProductoCatalogo = todosProductos.some(p => p.codigo === s.codigo);
 
-    const verificado = await confirmarEliminacionUI(`Se eliminará la salida de ${cant} u. de "${desc}". El stock será restaurado automáticamente.`);
+    const verificado = await confirmarEliminacionUI(
+        `Se eliminará la salida de ${cant} u. de "${desc}". ${esProductoCatalogo ? 'El stock será restaurado automáticamente.' : ''}`
+    );
     if (!verificado) return;
 
     try {
@@ -722,8 +743,10 @@ async function eliminarSalidaDesdeMenu() {
         const { error } = await sb.from('salidas').delete().eq('id', s.id);
         if (error) throw error;
 
-        // 2. Revertir el stock
-        await ajustarStock(s.codigo, cant);
+        // 2. Revertir stock solo si era un producto del catálogo
+        if (esProductoCatalogo) {
+            await ajustarStock(s.codigo, cant);
+        }
 
         // 3. Refrescar estado local
         todasSalidas = todasSalidas.filter(x => x.id !== s.id);
@@ -732,19 +755,17 @@ async function eliminarSalidaDesdeMenu() {
         const txtBuscar = document.getElementById('txtBuscar')?.value || '';
         renderizarTodo(txtBuscar);
         
-        mostrarToast('Salida eliminada y stock restaurado', 'ok');
+        mostrarToast('Salida eliminada correctamente', 'ok');
     } catch (err) {
         mostrarToast('Error al eliminar: ' + err.message, 'err');
     }
 }
 
-// ══════════════════════════════════════════════════════════
 //  UTILIDADES
-// ══════════════════════════════════════════════════════════
 function descripcionDeCodigo(codigo) {
-    if (!codigo) return '';
+    if (!codigo) return 'Sin descripción';
     const p = todosProductos.find(x => x.codigo === codigo);
-    return p ? (p.descripcion || '') : codigo;
+    return p ? (p.descripcion || codigo) : codigo;
 }
 
 function nombreBus(idBus) {

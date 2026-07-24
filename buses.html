@@ -253,7 +253,7 @@
         .menu-sep { height: 1px; background: #f1f5f9; margin: 0; }
 
         /* ═══════════════════════════════════
-           SHEET MODAL PARA EDITAR BUS
+           SHEET MODAL PARA EDITAR / CREAR BUS
            ═══════════════════════════════════ */
         #overlaySheet {
             display: none;
@@ -470,19 +470,20 @@
         +
     </button>
 
-    <!-- SHEET MODAL PARA EDITAR BUS -->
+    <!-- SHEET MODAL PARA CREAR Y EDITAR BUS -->
     <div id="overlaySheet"></div>
     <div id="hojaSheet">
         <div class="sheet-handle" id="sheetHandle"></div>
         <div class="sheet-titulo" id="sheetTitulo">Editar Bus</div>
         
         <div class="sheet-body">
-            <div class="campo-foto" onclick="document.getElementById('editFoto').click()" title="Haz clic para cambiar la foto">
+            <div class="campo-foto" onclick="document.getElementById('editFoto').click()" title="Haz clic para seleccionar o tomar foto">
                 <input type="file" id="editFoto" accept="image/*" style="display: none;">
                 <div class="preview-camera-box" id="previewEditFoto">
                     <span id="iconEditCamara" style="font-size: 32px;">📸</span>
                 </div>
-                <span style="font-size: 13px; color: #284B87; font-weight: bold; cursor: pointer;">CAMBIAR FOTO</span>
+                <!-- ID lblTextoFoto agregado para actualización dinámica desde JavaScript -->
+                <span id="lblTextoFoto" style="font-size: 13px; color: #284B87; font-weight: bold; cursor: pointer;">CAMBIAR FOTO</span>
             </div>
 
             <div class="campo">
