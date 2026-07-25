@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Servicios y Trabajos | ThermoAir</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    background: #203764;
+    font-family: Calibri, "Segoe UI", Arial, sans-serif;
+    color: #1f2937;
+}
+
+/* ── HEADER ── */
+header {
+    min-height: 70px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    color: white;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.logo-area { display: flex; align-items: center; }
+.logo { height: 36px; width: auto; }
+.separador { width: 2px; height: 28px; background: rgba(255,255,255,.35); margin: 0 12px; }
+.modulo { color: white; font-size: 22px; font-style: italic; font-weight: normal; }
+header a { color: white; text-decoration: none; font-size: 15px; font-weight: bold; }
+header a:hover { text-decoration: underline; }
+
+/* ── MAIN ── */
+main {
+    margin: 0 25px 25px 25px;
+    background: white;
+    border-radius: 16px;
+    padding: 25px;
+    box-shadow: 0 18px 45px rgba(0,0,0,.25);
+    min-height: calc(100vh - 95px);
+}
+
+h2 { color: #203764; margin-bottom: 20px; font-size: 28px; font-weight: normal; }
+
+/* ── BUSCADOR PRINCIPAL ── */
+#txtBuscar {
+    width: 100%;
+    padding: 14px 18px;
+    font-size: 16px;
+    border: 2px solid #d2d9e6;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    outline: none;
+    transition: .20s;
+    text-transform: uppercase;
+}
+#txtBuscar:focus { border-color: #203764; box-shadow: 0 0 0 4px rgba(32,55,100,.15); }
+
+/* ── TABLA PC ── */
+.table-container {
+    border-radius: 10px;
+    overflow: auto;
+    border: 1px solid #d7dde8;
+    max-height: 72vh;
+}
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+thead th {
+    background: #284B87;
+    color: white;
+    padding: 12px 14px;
+    position: sticky;
+    top: 0;
+    text-align: left;
+    white-space: nowrap;
+    z-index: 20;
+}
+tbody td { padding: 11px 14px; border-bottom: 1px solid #e6ebf2; color: #203764; }
+tbody tr:nth-child(even) { background: #fafbfc; }
+tbody tr:hover { background: #dfe9ff; cursor: pointer; }
+
+/* ── CARDS MÓVIL ── */
+.mobile-cards-container { display: none; flex-direction: column; gap: 12px; }
+.card-trabajo {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+}
+
+/* ── BOTONES FLOTANTES IGUALES ── */
+#btnNuevoTrabajo, .btn-float-mic {
+    position: fixed;
+    right: 24px;
+    width: 56px;
+    height: 56px;
+    background: #284B87;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    font-size: 28px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0,0,0,.35);
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s, background-color 0.2s;
+}
+
+#btnNuevoTrabajo { bottom: 24px; }
+
+/* Ubicado exactamente arriba del botón + con la misma estética */
+.btn-float-mic { bottom: 90px; }
+
+#btnNuevoTrabajo:hover, .btn-float-mic:hover {
+    transform: scale(1.08);
+    background-color: #203764;
+}
+
+/* ── MODAL / SHEET DE CONTROL POR VOZ ── */
+.modal-voz-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-voz-content {
+    background: #ffffff;
+    width: 90%;
+    max-width: 480px;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+}
+
+.modal-voz-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 10px;
+}
+
+.modal-voz-header h3 {
+    color: #203764;
+    font-size: 18px;
+    margin: 0;
+}
+
+.btn-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #64748b;
+    cursor: pointer;
+}
+
+.modal-voz-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.mic-status-box {
+    font-size: 13px;
+    color: #64748b;
+    text-align: center;
+}
+
+.btn-rec {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    border: none;
+    background: #ef4444;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+}
+
+.btn-rec.recording {
+    animation: pulse-red 1.5s infinite;
+    background: #dc2626;
+}
+
+@keyframes pulse-red {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+#txtTranscripcion {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 10px;
+    font-family: inherit;
+    resize: none;
+    font-size: 14px;
+}
+
+.btn-procesar-ia {
+    width: 100%;
+    padding: 12px;
+    background: #10b981;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.btn-procesar-ia:disabled {
+    background: #cbd5e1;
+    cursor: not-allowed;
+}
+
+/* ── SHEET OVERLAY ── */
+#overlaySheet {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.5);
+    z-index: 1000;
+}
+#overlaySheet.visible { display: block; }
+
+#hojaSheet {
+    position: fixed;
+    bottom: -100%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 600px;
+    background: white;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -5px 25px rgba(0,0,0,.2);
+    z-index: 1001;
+    transition: bottom .3s ease-out;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+#hojaSheet.visible { bottom: 0; }
+
+.sheet-handle {
+    width: 40px;
+    height: 5px;
+    background: #cbd5e1;
+    border-radius: 3px;
+    margin: 10px auto 4px auto;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.sheet-titulo {
+    color: #203764;
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+    padding: 8px 16px;
+    border-bottom: 1px solid #f1f5f9;
+    flex-shrink: 0;
+}
+
+.sheet-body { 
+    padding: 16px; 
+    overflow-y: auto; 
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Campos del formulario */
+.campo { display: flex; flex-direction: column; }
+.campo label {
+    font-size: 11px;
+    font-weight: bold;
+    color: #203764;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+}
+.campo input, .campo select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 8px;
+    outline: none;
+    font-size: 14px;
+    font-family: inherit;
+    background: white;
+    text-transform: uppercase;
+}
+.campo input:focus, .campo select:focus { border-color: #284B87; }
+
+/* ── BÚSQUEDA DE SERVICIOS ── */
+.buscador-servicios-box {
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    position: relative;
+}
+
+#dropdownServicios {
+    display: none;
+    background: white;
+    border: 1.5px solid #284B87;
+    border-radius: 8px;
+    max-height: 180px;
+    overflow-y: auto;
+    position: absolute;
+    top: 68px;
+    left: 12px;
+    right: 12px;
+    z-index: 1100;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+}
+
+.dropdown-item {
+    padding: 10px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 13px;
+    color: #1f2937;
+}
+.dropdown-item:hover { background: #dfe9ff; color: #203764; }
+
+/* Mini tabla */
+.mini-tabla-wrap {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow-y: auto;
+    max-height: 140px;
+    background: white;
+}
+.mini-tabla-wrap table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.mini-tabla-wrap thead th {
+    background: #475569;
+    color: white;
+    padding: 8px 10px;
+    text-align: left;
+    position: sticky;
+    top: 0;
+}
+.mini-tabla-wrap tbody td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; }
+
+.btn-agregar-item {
+    width: 100%;
+    padding: 10px;
+    background: #284B87;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 13px;
+    cursor: pointer;
+}
+.btn-agregar-item:hover { background: #203764; }
+
+.btn-confirmar {
+    width: 100%;
+    padding: 12px;
+    background: #10b981;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 5px;
+}
+
+/* ── MENÚ CONTEXTUAL ── */
+#menuContextual {
+    display: none;
+    position: fixed;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.18);
+    z-index: 2000;
+    overflow: hidden;
+    min-width: 160px;
+    border: 1px solid #e2e8f0;
+}
+#menuContextual.visible { display: block; }
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #203764;
+}
+.menu-item:hover { background: #f1f5f9; }
+.menu-item.danger { color: #dc2626; }
+.menu-item.danger:hover { background: #fef2f2; }
+.menu-sep { height: 1px; background: #f1f5f9; margin: 0; }
+
+/* ── TOAST ── */
+#toast {
+    position: fixed;
+    bottom: 90px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #1e293b;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: bold;
+    opacity: 0;
+    transition: opacity .25s, transform .25s;
+    z-index: 3000;
+    pointer-events: none;
+    white-space: nowrap;
+}
+#toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── ADAPTACIÓN MÓVIL ── */
+@media (max-width: 768px) {
+    header { padding: 10px 16px; }
+    .logo { height: 30px; }
+    .modulo { font-size: 18px; }
+    .separador { height: 20px; margin: 0 8px; }
+    header a { font-size: 13px; }
+
+    main { 
+        margin: 0; 
+        padding: 16px 12px; 
+        border-radius: 0; 
+        box-shadow: none; 
+        min-height: calc(100vh - 60px);
+    }
+    
+    h2 { font-size: 22px; margin-bottom: 14px; }
+    #txtBuscar { padding: 12px 14px; font-size: 14px; margin-bottom: 16px; }
+
+    .table-container { display: none; }
+    .mobile-cards-container { display: flex; }
+
+    #hojaSheet { 
+        max-width: 100%; 
+        max-height: 92vh; 
+        border-radius: 16px 16px 0 0; 
+    }
+}
+</style>
+</head>
+<body>
+
+<header>
+    <div class="logo-area">
+        <img src="Logo/Imagotipo_ThermoAir.svg" alt="ThermoAir" class="logo">
+        <div class="separador"></div>
+        <div class="modulo">Servicios de Taller</div>
+    </div>
+    <a href="index_gestion.html">← Menú principal</a>
+</header>
+
+<main>
+    <h2>Registro de Servicios / Trabajos</h2>
+    <input type="text" id="txtBuscar" placeholder="Buscar por Bus, Placa, Cliente, Servicio, Técnico...">
+
+    <div class="table-container" id="vistaPC">
+        <table>
+            <thead>
+                <tr>
+                    <th>BUS / PLACA</th>
+                    <th>TRABAJO / SERVICIO</th>
+                    <th>TÉCNICO</th>
+                    <th>CLIENTE</th>
+                    <th>EMPRESA</th>
+                </tr>
+            </thead>
+            <tbody id="tablaBody"></tbody>
+        </table>
+    </div>
+
+    <div class="mobile-cards-container" id="vistaMobile"></div>
+</main>
+
+<!-- BOTÓN FLOTANTE DE MICRÓFONO (Mismo estilo que btnNuevoTrabajo) -->
+<button id="btnVozOrdenes" class="btn-float-mic" title="Comando por Voz">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+        <line x1="12" y1="19" x2="12" y2="23"></line>
+        <line x1="8" y1="23" x2="16" y2="23"></line>
+    </svg>
+</button>
+
+<!-- BOTÓN FLOTANTE NUEVO TRABAJO (+) -->
+<button id="btnNuevoTrabajo" title="Registrar Servicio">+</button>
+
+<!-- MODAL DE CONTROL POR VOZ -->
+<div id="modalVoz" class="modal-voz-overlay" style="display: none;">
+    <div class="modal-voz-content">
+        <div class="modal-voz-header">
+            <h3>Orden Rápida por Voz</h3>
+            <button id="cerrarModalVoz" class="btn-close">&times;</button>
+        </div>
+        <div class="modal-voz-body">
+            <div id="micStatus" class="mic-status-box">Presiona el micrófono y dicta la orden...</div>
+            
+            <button id="btnGrabarVoz" class="btn-rec">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                </svg>
+            </button>
+
+            <textarea id="txtTranscripcion" placeholder="Aquí aparecerá lo que digas..." rows="4"></textarea>
+
+            <button id="btnProcesarVoz" class="btn-procesar-ia" disabled>
+                Procesar Orden con IA
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- SHEET REGISTRO MANUAL -->
+<div id="overlaySheet"></div>
+<div id="hojaSheet">
+    <div class="sheet-handle" id="sheetHandle"></div>
+    <div class="sheet-titulo" id="sheetTitulo">Nuevo Trabajo para Bus</div>
+    
+    <div class="sheet-body">
+        <!-- SECCIÓN 1: DATOS DEL BUS -->
+        <div>
+            <div class="campo">
+                <label>Bus</label>
+                <select id="selBus">
+                    <option value="">— Seleccionar bus —</option>
+                </select>
+            </div>
+        </div>
+
+        <hr style="border:none;border-top:1px solid #f1f5f9;margin:4px 0;">
+
+        <!-- SECCIÓN 2: BÚSQUEDA Y SELECCIÓN DE SERVICIOS -->
+        <div class="buscador-servicios-box">
+            <div class="campo">
+                <label>Servicio Realizado (Catálogo)</label>
+                <input type="text" id="inputServicio" placeholder="Buscar por código o nombre..." autocomplete="off">
+            </div>
+            
+            <div id="dropdownServicios"></div>
+
+            <button type="button" class="btn-agregar-item" onclick="agregarItemPendiente()">＋ Agregar Servicio</button>
+        </div>
+
+        <!-- SECCIÓN 3: TABLA DE SERVICIOS AGREGADOS -->
+        <div class="mini-tabla-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>CÓDIGO</th>
+                        <th>DESCRIPCIÓN</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="miniTablaBody">
+                    <tr><td colspan="3" class="mini-tabla-vacia" style="text-align:center; color:#94a3b8; padding:15px;">Aún no hay servicios agregados.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <hr style="border:none;border-top:1px solid #f1f5f9;margin:4px 0;">
+
+        <!-- SECCIÓN 4: TÉCNICO (OPCIONAL) -->
+        <div class="campo">
+            <label>Técnico Encargado (Opcional)</label>
+            <input type="text" id="inputTecnico" placeholder="Nombre del técnico">
+        </div>
+
+        <!-- BOTÓN CONFIRMAR -->
+        <button type="button" class="btn-confirmar" id="btnConfirmar" onclick="confirmarSalidas()">Guardar Trabajo</button>
+    </div>
+</div>
+
+<!-- MENÚ CONTEXTUAL -->
+<div id="menuContextual">
+    <div class="menu-item" onclick="editarSalidaDesdeMenu()">✏️ Editar</div>
+    <div class="menu-sep"></div>
+    <div class="menu-item danger" onclick="eliminarSalidaDesdeMenu()">🗑️ Eliminar</div>
+</div>
+
+<div id="toast"></div>
+
+<script src="servicios.js"></script>
+
+<!-- SCRIPT DE CONTROL DEL MODAL -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const btnVoz = document.getElementById('btnVozOrdenes');
+    const modalVoz = document.getElementById('modalVoz');
+    const btnCerrar = document.getElementById('cerrarModalVoz');
+
+    if (btnVoz && modalVoz) {
+        btnVoz.addEventListener('click', () => {
+            modalVoz.style.display = 'flex';
+        });
+    }
+
+    if (btnCerrar && modalVoz) {
+        btnCerrar.addEventListener('click', () => {
+            modalVoz.style.display = 'none';
+        });
+    }
+});
+</script>
+</body>
+</html>
