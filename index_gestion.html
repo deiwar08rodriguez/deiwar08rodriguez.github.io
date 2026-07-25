@@ -13,17 +13,20 @@
             box-sizing: border-box;
         }
 
-        body {
+        html, body {
+            width: 100%;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden; /* Evita cualquier barra de desplazamiento global */
             background: #ffffff;
             font-family: Calibri, "Segoe UI", Arial, sans-serif;
-            min-height: 100vh;
-            display: flex;
         }
 
         .dashboard-container {
             display: flex;
             width: 100vw;
             height: 100vh;
+            height: 100dvh;
         }
 
         .brand-side {
@@ -58,40 +61,35 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
-            padding: 0 10%;
+            padding: 0 8%;
             background: #f8fafc;
-            overflow-y: auto; /* Permite scroll si la pantalla de la PC es muy baja */
+            overflow: hidden; /* Encaja todo exactamente sin scrollbars en escritorio */
         }
 
         .menu-side h2 {
             color: #203764;
-            font-size: 36px;
+            font-size: 32px;
             font-weight: bold;
-            margin-bottom: 10px;
+            margin-bottom: 6px;
         }
 
         .subtitle {
             color: #64748b;
-            font-size: 16px;
-            margin-bottom: 40px;
+            font-size: 15px;
+            margin-bottom: 28px;
         }
 
         .menu-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 25px;
-        }
-
-        /* Hace que si hay un número impar de elementos (5), el último ocupe las dos columnas en PC */
-        .tarjeta-opcion:nth-child(5):last-child {
-            grid-column: span 2;
+            gap: 18px; /* Espaciado ajustado para 6 tarjetas en 2x3 */
         }
 
         .tarjeta-opcion {
             background: white;
             border: 1px solid #e2e8f0;
             border-radius: 14px;
-            padding: 35px 25px;
+            padding: 24px 20px;
             text-decoration: none;
             display: flex;
             flex-direction: column;
@@ -100,41 +98,41 @@
         }
 
         .icon-wrapper {
-            width: 48px;
-            height: 48px;
+            width: 44px;
+            height: 44px;
             border-radius: 10px;
             background: rgba(40, 75, 135, 0.08);
             color: #284B87;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 20px;
+            margin-bottom: 14px;
             transition: all .25s ease;
         }
 
         .icon-wrapper svg {
-            width: 24px;
-            height: 24px;
+            width: 22px;
+            height: 22px;
         }
 
         .tarjeta-opcion .titulo-btn {
             color: #203764;
-            font-size: 22px;
+            font-size: 20px;
             font-weight: bold;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             letter-spacing: 0.5px;
         }
 
         .tarjeta-opcion .desc-btn {
             color: #64748b;
-            font-size: 14px;
-            line-height: 1.4;
+            font-size: 13.5px;
+            line-height: 1.35;
         }
 
         .tarjeta-opcion:hover {
-            transform: translateY(-5px);
+            transform: translateY(-4px);
             border-color: #284B87;
-            box-shadow: 0 20px 25px -5px rgba(32, 55, 100, 0.1);
+            box-shadow: 0 15px 20px -5px rgba(32, 55, 100, 0.1);
         }
 
         .tarjeta-opcion:hover .icon-wrapper {
@@ -146,8 +144,17 @@
             color: #284B87;
         }
 
+        /* En pantallas móviles sí permitimos scroll si la altura no alcanza */
         @media (max-width: 900px) {
-            .dashboard-container { flex-direction: column; height: auto; }
+            html, body {
+                height: auto;
+                overflow: auto;
+            }
+
+            .dashboard-container {
+                flex-direction: column;
+                height: auto;
+            }
 
             .brand-side {
                 flex: none;
@@ -163,6 +170,7 @@
                 padding: 30px 24px;
                 background: #f8fafc;
                 justify-content: flex-start;
+                overflow: visible;
             }
 
             .menu-side h2 { font-size: 24px; margin-bottom: 4px; }
@@ -171,11 +179,6 @@
             .menu-grid {
                 grid-template-columns: 1fr;
                 gap: 16px;
-            }
-
-            /* Desactiva el span de dos columnas en móvil para que fluya de a uno */
-            .tarjeta-opcion:nth-child(5):last-child {
-                grid-column: unset;
             }
 
             .tarjeta-opcion {
@@ -220,7 +223,7 @@
                     </div>
                 </a>
 
-                <a href="buses.html" class="tarjeta-opcion">
+                <a href="buses.html" class="tarjeta-opcion" id="btnBuses">
                     <div class="icon-wrapper">
                         <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
                     </div>
@@ -240,7 +243,7 @@
                     </div>
                 </a>
 
-<a href="facturas_ventas.html" class="tarjeta-opcion" id="btnVentas">
+                <a href="facturas_ventas.html" class="tarjeta-opcion" id="btnVentas">
                     <div class="icon-wrapper">
                         <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     </div>
@@ -260,7 +263,17 @@
                     </div>
                 </a>
 
-</div>
+                <a href="servicios.html" class="tarjeta-opcion" id="btnServicios">
+                    <div class="icon-wrapper">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    </div>
+                    <div>
+                        <div class="titulo-btn">SERVICIOS</div>
+                        <div class="desc-btn">Mantenimiento, instalaciones y servicios técnicos.</div>
+                    </div>
+                </a>
+
+            </div>
         </div>
 
     </div>
