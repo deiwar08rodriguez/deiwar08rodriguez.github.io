@@ -1,4 +1,4 @@
-// THERMOAIR SAS - SERVICIOS Y TRABAJOS EN TALLER
+// THERMOAIR SAS - SERVICIOS Y TRABAJOS EN TALLER CON INTEGRACIÓN GEMINI IA
 
 // ── CONFIGURACIÓN SUPABASE ──
 const SUPABASE_URL  = 'https://vdlxmajvzdtbewchyowm.supabase.co';
@@ -6,11 +6,14 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
+// ── CONFIGURACIÓN GEMINI IA ──
+const GEMINI_API_KEY = 'AQ.Ab8RN6Ji4Fv4g2m_zGByTvDSuvIrkvXI1R-Fq1-hDmVMQcLJkw'; 
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${GEMINI_API_KEY}`;
 // ── ESTADO GLOBAL ──
-let todosTrabajos   = [];  // Trabajos de la tabla 'trabajos'
-let todosServicios  = [];  // { codigo, descripcion, precio } del catálogo
-let todosBuses      = [];  // { id, bus, placa, cliente, empresa, estado }
-let itemsPendientes = [];  // Servicios acumulados en el sheet antes de confirmar
+let todosTrabajos   = []; 
+let todosServicios  = []; 
+let todosBuses      = []; 
+let itemsPendientes = []; 
 
 // Edición
 let trabajoEnContexto = null;
@@ -22,25 +25,29 @@ let servicioSeleccionado = null;
 
 // ── INIT ──
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log("🚀 [INIT] Cargando app THERMOAIR SAS...");
     await Promise.all([cargarServicios(), cargarBuses()]);
     await cargarTrabajos();
     renderizarTodo();
     bindUI();
+    console.log("✅ [INIT] Carga inicial completa.");
 });
 
 // ── CARGA DE DATOS ──
 async function cargarServicios() {
+    console.log("📦 [SUPABASE] Solicitando tabla 'servicios'...");
     const { data, error } = await sb.from('servicios').select('codigo, descripcion, precio');
     if (error) { 
-        console.error('Error cargando servicios:', error); 
+        console.error('❌ Error cargando servicios:', error); 
         mostrarToast('Error al cargar servicios', 'err');
         return; 
     }
     todosServicios = data || [];
+    console.log(`✅ [SUPABASE] ${todosServicios.length} servicios cargados.`);
 }
 
 async function cargarBuses() {
-    // Se elimina 'empresa' del .select() porque no existe en la tabla buses
+    console.log("🚌 [SUPABASE] Solicitando tabla 'buses' (estado = ABIERTO)...");
     const { data, error } = await sb
         .from('buses')
         .select('id, bus, placa, estado, cliente') 
@@ -48,14 +55,14 @@ async function cargarBuses() {
         .order('placa');
 
     if (error) { 
-        console.error('Error cargando buses:', error); 
+        console.error('❌ Error cargando buses:', error); 
         mostrarToast('Error al cargar buses', 'err');
         return; 
     }
 
     todosBuses = data || [];
+    console.log(`✅ [SUPABASE] ${todosBuses.length} buses abiertos cargados:`, todosBuses);
 
-    // Poblar select del sheet
     const sel = document.getElementById('selBus');
     if (sel) {
         sel.innerHTML = '<option value="">— Seleccionar bus —</option>';
@@ -69,6 +76,7 @@ async function cargarBuses() {
 }
 
 async function cargarTrabajos() {
+    console.log("📋 [SUPABASE] Solicitando tabla 'trabajos'...");
     const { data, error } = await sb
         .from('trabajos')
         .select('*')
@@ -76,11 +84,12 @@ async function cargarTrabajos() {
         .order('id', { ascending: false });
 
     if (error) { 
-        console.error('Error cargando trabajos:', error); 
+        console.error('❌ Error cargando trabajos:', error); 
         mostrarToast('Error al cargar trabajos', 'err');
         return; 
     }
     todosTrabajos = data || [];
+    console.log(`✅ [SUPABASE] ${todosTrabajos.length} trabajos cargados.`);
 }
 
 // ── RENDERIZADO ──
@@ -243,6 +252,21 @@ function bindUI() {
     const btnNuevo = document.getElementById('btnNuevoTrabajo');
     if (btnNuevo) btnNuevo.addEventListener('click', () => abrirSheet());
 
+    const btnIA = document.getElementById('btnProcesarIA');
+    if (btnIA) {
+        btnIA.addEventListener('click', async (e) => {
+            e.preventDefault(); // Evita recarga de página
+            console.log("🤖 Click en botón Procesar IA");
+            const texto = prompt('Ingresa o dicta el reporte de trabajo para la IA:');
+            console.log("📝 Texto ingresado en prompt:", texto);
+            if (texto) {
+                await procesarTextoConIA(texto);
+            } else {
+                console.warn("⚠️ Operación cancelada o prompt vacío.");
+            }
+        });
+    }
+
     const overlay = document.getElementById('overlaySheet');
     const handle = document.getElementById('sheetHandle');
     if (overlay) overlay.addEventListener('click', cerrarSheet);
@@ -259,16 +283,11 @@ function bindUI() {
     if (inputServ) {
         inputServ.addEventListener('input', e => buscarServicioDropdown(e.target.value));
         
-        // ── DETECTAR TECLA ENTER ──
         inputServ.addEventListener('keydown', e => {
             if (e.key === 'Enter') {
-                e.preventDefault(); // Evita el submit del formulario si existe
-                
-                // Ocultar dropdown si está visible
+                e.preventDefault();
                 const drop = document.getElementById('dropdownServicios');
                 if (drop) drop.style.display = 'none';
-
-                // Agregar el ítem a la mini tabla
                 agregarItemPendiente();
             }
         });
@@ -280,10 +299,16 @@ function bindUI() {
             }, 200);
         });
     }
+
+    const btnConfirmar = document.getElementById('btnConfirmar');
+    if (btnConfirmar) {
+        btnConfirmar.addEventListener('click', confirmarSalidas);
+    }
 }
 
 // ── SHEET: ABRIR / CERRAR ──
 function abrirSheet(trabajoEditar = null) {
+    console.log("📂 [SHEET] Abriendo panel lateral...");
     itemsPendientes = [];
     servicioSeleccionado = null;
     trabajoEdicionOriginal = trabajoEditar;
@@ -303,7 +328,6 @@ function abrirSheet(trabajoEditar = null) {
         document.getElementById('sheetTitulo').textContent = 'Editar Trabajo';
         if (inputTec) inputTec.value = trabajoEditar.tecnico || '';
 
-        // Buscar bus por coincidencia de placa o n_bus
         const busObj = todosBuses.find(b => b.placa === trabajoEditar.PLACA || b.bus === trabajoEditar.N_BUS);
         if (busObj && selBus) selBus.value = busObj.id;
 
@@ -320,13 +344,18 @@ function abrirSheet(trabajoEditar = null) {
 
     renderMiniTabla();
 
-    document.getElementById('overlaySheet').classList.add('visible');
-    setTimeout(() => document.getElementById('hojaSheet').classList.add('visible'), 10);
+    const overlay = document.getElementById('overlaySheet');
+    const hoja = document.getElementById('hojaSheet');
+    if (overlay) overlay.classList.add('visible');
+    if (hoja) setTimeout(() => hoja.classList.add('visible'), 10);
 }
 
 function cerrarSheet() {
-    document.getElementById('hojaSheet').classList.remove('visible');
-    document.getElementById('overlaySheet').classList.remove('visible');
+    console.log("🚪 [SHEET] Cerrando panel lateral...");
+    const overlay = document.getElementById('overlaySheet');
+    const hoja = document.getElementById('hojaSheet');
+    if (hoja) hoja.classList.remove('visible');
+    if (overlay) overlay.classList.remove('visible');
     
     const drop = document.getElementById('dropdownServicios');
     if (drop) drop.style.display = 'none';
@@ -400,7 +429,6 @@ function agregarItemPendiente() {
     resetearInputs();
     renderMiniTabla();
 
-    // Reenfocar el input para seguir escribiendo de inmediato
     if (inputServ) inputServ.focus();
 }
 
@@ -449,6 +477,8 @@ function resetearInputs() {
 function renderMiniTabla() {
     const tbody = document.getElementById('miniTablaBody');
     if (!tbody) return;
+
+    console.log(`📊 [MINI TABLA] Renders con ${itemsPendientes.length} tareas:`, itemsPendientes);
 
     if (!itemsPendientes.length) {
         tbody.innerHTML = `<tr><td colspan="3" class="mini-tabla-vacia" style="text-align:center;color:#94a3b8;padding:15px;">Aún no hay servicios. Agrega tareas arriba.</td></tr>`;
@@ -506,7 +536,6 @@ async function confirmarSalidas() {
     const hoy = fechaHoy();
 
     try {
-        // En caso de edición borramos el registro previo
         if (trabajoEdicionOriginal) {
             const { error: errDelete } = await sb
                 .from('trabajos')
@@ -516,17 +545,15 @@ async function confirmarSalidas() {
             if (errDelete) throw errDelete;
         }
 
-        // Dentro de confirmarSalidas(), ajusta el objeto que mandas en el .insert():
-
         for (const item of itemsPendientes) {
             const { error: errInsert } = await sb.from('trabajos').insert({
                 FECHA:   hoy,
                 CLIENTE: busObj.cliente ? busObj.cliente.toUpperCase() : null,
-                EMPRESA: busObj.empresa ? busObj.empresa.toUpperCase() : null,
+                EMPRESA: null,
                 N_BUS:   busObj.bus     ? busObj.bus.toUpperCase()     : null,
                 PLACA:   busObj.placa   ? busObj.placa.toUpperCase()   : null,
-                TRABAJO: item.descripcion ? item.descripcion.toUpperCase() : null, // <--- Forzar mayúsculas
-                tecnico: tecnico          ? tecnico.toUpperCase()          : null  // <--- Forzar mayúsculas
+                TRABAJO: item.descripcion ? item.descripcion.toUpperCase() : null,
+                tecnico: tecnico         ? tecnico.toUpperCase()         : null
             });
 
             if (errInsert) throw errInsert;
@@ -541,7 +568,7 @@ async function confirmarSalidas() {
         mostrarToast('Trabajos asignados correctamente', 'ok');
 
     } catch (err) {
-        console.error('Error guardando:', err);
+        console.error('❌ Error guardando:', err);
         mostrarToast('Error al guardar: ' + (err.message || 'Error desconocido'), 'err');
     } finally {
         if (btn) {
@@ -665,6 +692,7 @@ function fechaHoy() {
 
 let toastTimer = null;
 function mostrarToast(msg, tipo = '') {
+    console.log(`💬 [TOAST ${tipo.toUpperCase()}] ${msg}`);
     const el = document.getElementById('toast');
     if (!el) return;
     el.textContent = msg;
@@ -673,188 +701,181 @@ function mostrarToast(msg, tipo = '') {
     toastTimer = setTimeout(() => el.className = '', 3000);
 }
 
-// =========================================================================
-// ── MÓDULO DE INTELIGENCIA ARTIFICIAL (IA, PROMPTS, PARSEO Y VERIFICACIÓN) ──
-// =========================================================================
-
-// Configuración del endpoint (Ajusta la URL y API Key de tu proveedor LLM o Edge Function)
-const IA_API_URL = 'https://api.openai.com/v1/chat/completions'; // O tu endpoint proxy de Supabase Edge Functions
-const IA_API_KEY = 'TU_API_KEY_AQUI'; // En producción, es ideal llamarlo a través de Supabase Edge Functions para no exponer la Key
-
-/**
- * 1. CONSTRUCTOR DEL PROMPT DE SISTEMA
- * Injecta el catálogo actual de servicios y buses en el prompt para guiar al modelo LLM.
- */
 function construirSystemPromptIA() {
-    // Formatear catálogo reduciendo tokens
     const catalogoServicios = todosServicios.map(s => `${s.codigo}: ${s.descripcion}`).join('\n');
-    const catalogoBuses = todosBuses.map(b => `ID:${b.id} | Placa:${b.placa} | Bus:${b.bus} | Cliente:${b.cliente || 'N/A'}`).join('\n');
+    
+    // Cambiamos para mostrar claramente el ID como texto exacto
+    const catalogoBuses = todosBuses.map(b => 
+        `ID: "${b.id}" | Placa: ${b.placa} | Identificador/Bus: ${b.bus} | Cliente: ${b.cliente || 'N/A'}`
+    ).join('\n');
 
-    return `Eres un asistente experto para THERMOAIR SAS. Tu objetivo es interpretar notas de voz o texto escrito por técnicos de taller y estructurar los datos en formato JSON estricto.
+    return `Eres un asistente experto para THERMOAIR SAS. Tu objetivo es interpretar reportes dictados por técnicos de taller y estructurar los datos extraídos.
 
-CATÁLOGO DE SERVICIOS DISPONIBLES (código: descripción):
+CATÁLOGO DE SERVICIOS DISPONIBLES:
 ${catalogoServicios}
 
-BUSES REGISTRADOS EN TALLER:
+BUSES REGISTRADOS EN TALLER (ACTIVOS):
 ${catalogoBuses}
 
-INSTRUCCIONES DE EXTRACCIÓN Y MATCHING:
-1. Identifica el bus (por Placa o Número de Bus/N_BUS). Si coincide con el catálogo, extrae su "id_bus".
-2. Identifica el técnico responsable mencionado. Si no hay técnico, asigna null.
-3. Extrae la lista de trabajos/servicios realizados:
-   - Si la descripción coincide o se parece mucho a un servicio del catálogo, usa EXACTAMENTE la descripción del catálogo y extrae su "codigo".
-   - Si es un trabajo custom o no estándar, pon "codigo": null y escribe la "descripcion" en MAYÚSCULAS y limpia.
-4. Devuelve ÚNICAMENTE un objeto JSON válido sin bloques markdown markdown (\`\`\`json) ni texto explicativo adicional.
-
-ESTRUCTURA DE RESPUESTA REQUERIDA (JSON):
-{
-  "bus_identificado": {
-    "id": number | null,
-    "placa": "string" | null,
-    "n_bus": "string" | null
-  },
-  "tecnico": "string" | null,
-  "servicios": [
-    {
-      "codigo": "string" | null,
-      "descripcion": "string"
-    }
-  ],
-  "confianza": "ALTA" | "MEDIA" | "BAJA",
-  "observaciones": "string" | null
-}`;
+INSTRUCCIONES CRÍTICAS PARA EL BUS:
+1. Analiza el reporte del técnico e identifica a qué bus se refiere (puede usar la placa, el número interno del bus, o nombres descriptivos como "bus de prueba", "el de prueba", etc.).
+2. Devuelve "id_bus" exactamente con el valor completo del campo ID que aparece entre comillas en la lista (ej: "BUS-1784995292581"). Si no logras identificarlo con certeza, devuelve null.
+3. Extrae el nombre del técnico responsable en "tecnico" (string o null).
+4. Extrae la lista de tareas en "servicios":
+   - Si la tarea coincide con un servicio del catálogo, usa EXACTAMENTE su descripción y código.
+   - Si es un trabajo custom o no está en el catálogo, asigna "codigo": null y escribe la "descripcion" en MAYÚSCULAS.`;
 }
 
-/**
- * 2. PROCESAMIENTO DE TRANSCRIPCIÓN CON LA IA
- * Recibe el texto de la dictada por voz/teclado y consulta al modelo.
- */
-async function procesarTextoConIA(transcripcionTexto) {
-    if (!transcripcionTexto || !transcripcionTexto.trim()) {
-        mostrarToast('Por favor ingresa o dicta una orden de trabajo.', 'err');
-        return null;
-    }
-
-    mostrarToast('Analizando reporte con IA...', '');
-
-    const systemPrompt = construirSystemPromptIA();
-    const userPrompt = `Transcripción a procesar: "${transcripcionTexto}"`;
-
+// ── FUNCIÓN DE PROCESAMIENTO AUTOMÁTICO DE IA ──
+async function procesarTextoConIA(textoReporte) {
+    mostrarToast('Analizando reporte con Gemini IA...', '');
+    
     try {
-        const response = await fetch(IA_API_URL, {
+        const systemPrompt = construirSystemPromptIA();
+
+        const payload = {
+            contents: [
+                {
+                    parts: [
+                        { text: systemPrompt },
+                        { text: `Reporte del técnico: "${textoReporte}"\n\nDevuelve exclusivamente un objeto JSON válido con las claves: id_bus (string exacto con el ID del bus entre comillas de la lista o null), tecnico (string o null), y servicios (array de objetos con codigo y descripcion). No incluyas markdown ni bloques de código de ningún tipo en la respuesta, solo el JSON plano.` }
+                    ]
+                }
+            ],
+            generationConfig: {
+                responseMimeType: "application/json"
+            }
+        };
+
+        const response = await fetch(GEMINI_API_URL, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${IA_API_KEY}`
-            },
-            body: JSON.stringify({
-                model: 'gpt-4o-mini', // O el modelo configurado
-                temperature: 0.1,    // Temperatura baja para consistencia estructural
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt }
-                ]
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
         });
 
-        if (!response.ok) {
-            throw new Error(`Error en el servicio de IA: ${response.statusText}`);
-        }
+        if (!response.ok) throw new Error('Error en la comunicación con la API de Gemini');
 
         const data = await response.json();
-        const rawContent = data.choices[0].message.content;
-
-        // 3. PARSEO Y SANITIZACIÓN DEL JSON
-        const resultadoEstructurado = sanitizarYParsearJSON(rawContent);
+        const textoRespuesta = data.candidates?.[0]?.content?.parts?.[0]?.text;
         
-        // 4. VERIFICACIÓN Y CARGA EN LA UI
-        verificarYAplicarResultadoIA(resultadoEstructurado);
+        if (!textoRespuesta) throw new Error('La IA no devolvió una respuesta válida');
+
+        const resultadoIA = JSON.parse(textoRespuesta);
+        console.log("🤖 [IA RESPUESTA]", resultadoIA);
+
+        if (!resultadoIA || !resultadoIA.servicios || resultadoIA.servicios.length === 0) {
+            mostrarToast('La IA no pudo extraer servicios del reporte', 'err');
+            return;
+        }
+
+        // Buscar el bus por ID exacto, o respaldar buscando por placa/número si la IA falló
+        let busObj = todosBuses.find(b => String(b.id) === String(resultadoIA.id_bus));
+        
+        if (!busObj && (resultadoIA.placa || resultadoIA.n_bus)) {
+            const p = (resultadoIA.placa || '').toUpperCase();
+            const nb = (resultadoIA.n_bus || '').toUpperCase();
+            busObj = todosBuses.find(b => 
+                (p && b.placa && b.placa.toUpperCase() === p) ||
+                (nb && b.bus && b.bus.toUpperCase() === nb)
+            );
+        }
+        
+        if (!busObj) {
+            console.warn("⚠️ Bus devuelto por la IA no encontrado:", resultadoIA);
+            mostrarToast('No se encontró el bus especificado por la IA', 'err');
+            return;
+        }
+
+        mostrarToast('Guardando automáticamente...', '');
+        const hoy = fechaHoy();
+        const tecnicoAsignado = resultadoIA.tecnico ? resultadoIA.tecnico.toUpperCase() : null;
+
+        // Insertar cada servicio extraído directamente en Supabase
+        for (const item of resultadoIA.servicios) {
+            const { error: errInsert } = await sb.from('trabajos').insert({
+                FECHA:   hoy,
+                CLIENTE: busObj.cliente ? busObj.cliente.toUpperCase() : null,
+                EMPRESA: null,
+                N_BUS:   busObj.bus     ? busObj.bus.toUpperCase()     : null,
+                PLACA:   busObj.placa   ? busObj.placa.toUpperCase()   : null,
+                TRABAJO: item.descripcion ? item.descripcion.toUpperCase() : null,
+                tecnico: tecnicoAsignado
+            });
+
+            if (errInsert) throw errInsert;
+        }
+
+        // Actualizar la interfaz y recargar la tabla principal
+        await cargarTrabajos();
+        const txtBuscar = document.getElementById('txtBuscar')?.value || '';
+        renderizarTodo(txtBuscar);
+        
+        mostrarToast('¡Reporte procesado y guardado con éxito!', 'ok');
 
     } catch (err) {
-        console.error('Error al procesar con IA:', err);
-        mostrarToast('Error procesando el texto con IA: ' + err.message, 'err');
+        console.error('❌ Error en automatización IA:', err);
+        mostrarToast('Error al automatizar: ' + (err.message || 'Error desconocido'), 'err');
     }
 }
 
-/**
- * 3. SANITIZACIÓN Y PARSEO ESTRUCTURADO DE JSON
- * Limpia cercas markdown y caracteres indeseados antes de hacer JSON.parse.
- */
-function sanitizarYParsearJSON(rawText) {
-    if (!rawText) throw new Error('La respuesta de la IA está vacía.');
-
-    // Eliminar etiquetas de bloque de código ```json ... ``` si las incluye
-    let cleanText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-
-    try {
-        return JSON.parse(cleanText);
-    } catch (e) {
-        console.error('Error parseando JSON raw:', cleanText);
-        throw new Error('La respuesta devuelta por la IA no tiene un formato JSON válido.');
-    }
-}
-
-/**
- * 4. VERIFICACIÓN Y AUTOPROCESAMIENTO EN EL SHEET DE TRABAJOS
- * Valida la respuesta de la IA, autoselecciona el bus y puebla la mini tabla de ítems.
- */
 function verificarYAplicarResultadoIA(datosIA) {
+    console.group("⚙️ [APLICAR IA] Inyectando datos en la UI");
+    console.log("Datos recibidos:", datosIA);
+
     if (!datosIA || typeof datosIA !== 'object') {
+        console.error("❌ datosIA no es un objeto válido");
         mostrarToast('Estructura de datos no válida.', 'err');
+        console.groupEnd();
         return;
     }
 
-    // Abrir la hoja lateral (Sheet) limpia
     abrirSheet();
 
-    // A. Verificar y asignar Bus
-    if (datosIA.bus_identificado && datosIA.bus_identificado.id) {
-        const selBus = document.getElementById('selBus');
-        if (selBus) {
-            selBus.value = datosIA.bus_identificado.id;
+    // 1. Asignación del Bus
+    const selBus = document.getElementById('selBus');
+    if (selBus) {
+        if (datosIA.id_bus) {
+            console.log(`🎯 Coincidencia directa por id_bus: ${datosIA.id_bus}`);
+            selBus.value = datosIA.id_bus;
+        } else if (datosIA.placa || datosIA.n_bus) {
+            const p = (datosIA.placa || '').toUpperCase();
+            const nb = (datosIA.n_bus || '').toUpperCase();
+            const busEncontrado = todosBuses.find(b => 
+                (p && b.placa && b.placa.toUpperCase() === p) ||
+                (nb && b.bus && b.bus.toUpperCase() === nb)
+            );
+            if (busEncontrado) {
+                console.log(`🎯 Bus encontrado por coincidencia de placa/número:`, busEncontrado);
+                selBus.value = busEncontrado.id;
+            } else {
+                console.warn("⚠️ No se encontró coincidencia de bus en la lista abierta.");
+            }
         }
-    } else if (datosIA.bus_identificado?.placa || datosIA.bus_identificado?.n_bus) {
-        // Búsqueda secundaria por si no devolvió ID exacto
-        const busCoincidente = todosBuses.find(b => 
-            (datosIA.bus_identificado.placa && b.placa.includes(datosIA.bus_identificado.placa)) ||
-            (datosIA.bus_identificado.n_bus && b.bus.includes(datosIA.bus_identificado.n_bus))
-        );
-        if (busCoincidente) {
-            const selBus = document.getElementById('selBus');
-            if (selBus) selBus.value = busCoincidente.id;
-        }
-    }
-
-    // B. Verificar y asignar Técnico
-    if (datosIA.tecnico) {
-        const inputTec = document.getElementById('inputTecnico');
-        if (inputTec) inputTec.value = datosIA.tecnico.toUpperCase();
-    }
-
-    // C. Cargar los servicios en la lista de itemsPendientes
-    if (Array.isArray(datosIA.servicios) && datosIA.servicios.length > 0) {
-        itemsPendientes = datosIA.servicios.map(serv => ({
-            codigo: serv.codigo || '',
-            descripcion: (serv.descripcion || '').toUpperCase()
-        }));
-
-        renderMiniTabla();
-        mostrarToast(`Se detectaron ${itemsPendientes.length} tareas con IA`, 'ok');
     } else {
-        mostrarToast('Se identificó el bus, pero no se extrajeron servicios.', 'err');
+        console.warn("⚠️ Elemento HTML '#selBus' no encontrado en el DOM");
     }
-}
 
-// ── EVENT LISTENERS RECOMENDADOS PARA INTEGRAR EN TU BIND UI ──
-/*
-// Puedes vincular un botón de dictado/procesamiento rápido así:
-const btnProcesarIA = document.getElementById('btnProcesarIA');
-if (btnProcesarIA) {
-    btnProcesarIA.addEventListener('click', () => {
-        const textoEntrada = prompt('Ingresa o dicta el reporte de trabajo:');
-        if (textoEntrada) {
-            procesarTextoConIA(textoEntrada);
-        }
-    });
+    // 2. Asignación del Técnico
+    const inputTec = document.getElementById('inputTecnico');
+    if (inputTec && datosIA.tecnico) {
+        inputTec.value = datosIA.tecnico.toUpperCase();
+    }
+
+    // 3. Asignación de Servicios/Tareas a la Mini Tabla
+    if (Array.isArray(datosIA.servicios) && datosIA.servicios.length > 0) {
+        datosIA.servicios.forEach(s => {
+            const desc = (s.descripcion || '').toUpperCase();
+            const cod = s.codigo || '';
+            if (desc) {
+                itemsPendientes.push({
+                    codigo: cod,
+                    descripcion: desc
+                });
+            }
+        });
+        renderMiniTabla();
+    }
+
+    mostrarToast('Datos procesados e inyectados por la IA', 'ok');
+    console.groupEnd();
 }
-*/

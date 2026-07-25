@@ -114,8 +114,6 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
 }
 
 #btnNuevoTrabajo { bottom: 24px; }
-
-/* Ubicado exactamente arriba del botón + con la misma estética */
 .btn-float-mic { bottom: 90px; }
 
 #btnNuevoTrabajo:hover, .btn-float-mic:hover {
@@ -506,7 +504,7 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
     <div class="mobile-cards-container" id="vistaMobile"></div>
 </main>
 
-<!-- BOTÓN FLOTANTE DE MICRÓFONO (Mismo estilo que btnNuevoTrabajo) -->
+<!-- BOTÓN FLOTANTE DE MICRÓFONO -->
 <button id="btnVozOrdenes" class="btn-float-mic" title="Comando por Voz">
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path>
@@ -616,23 +614,142 @@ tbody tr:hover { background: #dfe9ff; cursor: pointer; }
 
 <script src="servicios.js"></script>
 
-<!-- SCRIPT DE CONTROL DEL MODAL -->
+<!-- CONTROL DEL MODAL Y GRABACIÓN DE VOZ -->
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const btnVoz = document.getElementById('btnVozOrdenes');
     const modalVoz = document.getElementById('modalVoz');
     const btnCerrar = document.getElementById('cerrarModalVoz');
+    const btnGrabar = document.getElementById('btnGrabarVoz');
+    const txtTranscripcion = document.getElementById('txtTranscripcion');
+    const micStatus = document.getElementById('micStatus');
+    const btnProcesar = document.getElementById('btnProcesarVoz');
 
+    let recognition = null;
+    let isRecording = false;
+
+    // 1. Abrir y Cerrar Modal
     if (btnVoz && modalVoz) {
         btnVoz.addEventListener('click', () => {
             modalVoz.style.display = 'flex';
         });
     }
 
-    if (btnCerrar && modalVoz) {
-        btnCerrar.addEventListener('click', () => {
-            modalVoz.style.display = 'none';
+    function cerrarModal() {
+        if (modalVoz) modalVoz.style.display = 'none';
+        detenerGrabacion();
+    }
+
+    if (btnCerrar) btnCerrar.addEventListener('click', cerrarModal);
+
+    // Habilitar o deshabilitar botón procesar según haya texto
+    if (txtTranscripcion && btnProcesar) {
+        txtTranscripcion.addEventListener('input', () => {
+            btnProcesar.disabled = txtTranscripcion.value.trim() === '';
         });
+    }
+
+    // 2. Inicialización de la API de Voz (Web Speech API)
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+        if (micStatus) {
+            micStatus.textContent = "Tu navegador no soporta el reconocimiento de voz por API.";
+            micStatus.style.color = "#ef4444";
+        }
+        if (btnGrabar) btnGrabar.disabled = true;
+        return;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.lang = 'es-ES';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    recognition.onstart = () => {
+        isRecording = true;
+        if (btnGrabar) btnGrabar.classList.add('recording');
+        if (micStatus) {
+            micStatus.textContent = "Escuchando... Dicta tu orden.";
+            micStatus.style.color = "#dc2626";
+        }
+    };
+
+    recognition.onresult = (event) => {
+        let textoFinal = '';
+        for (let i = 0; i < event.results.length; ++i) {
+            textoFinal += event.results[i][0].transcript;
+        }
+        if (txtTranscripcion) {
+            txtTranscripcion.value = textoFinal;
+        }
+        if (btnProcesar) {
+            btnProcesar.disabled = textoFinal.trim() === '';
+        }
+    };
+
+    recognition.onerror = (event) => {
+        console.error("Error en el reconocimiento de voz:", event.error);
+        if (micStatus) micStatus.textContent = "Error al escuchar: " + event.error;
+        detenerGrabacion();
+    };
+
+    recognition.onend = () => {
+        detenerGrabacion();
+    };
+
+    function detenerGrabacion() {
+        if (isRecording && recognition) {
+            recognition.stop();
+        }
+        isRecording = false;
+        if (btnGrabar) btnGrabar.classList.remove('recording');
+        if (micStatus) {
+            micStatus.textContent = "Presiona el micrófono y dicta la orden...";
+            micStatus.style.color = "#64748b";
+        }
+    }
+
+    // 3. Toggle al presionar el botón rojo del micrófono
+    if (btnGrabar) {
+        btnGrabar.addEventListener('click', () => {
+            if (isRecording) {
+                detenerGrabacion();
+            } else {
+                try {
+                    recognition.start();
+                } catch (e) {
+                    console.error("No se pudo iniciar el micrófono:", e);
+                }
+            }
+        });
+    }
+
+    // 4. ACCIÓN DEL BOTÓN PROCESAR CON IA
+    if (btnProcesar) {
+        btnProcesar.addEventListener('click', () => {
+            const transcripcion = txtTranscripcion.value.trim();
+            if (!transcripcion) return;
+
+            detenerGrabacion();
+            procesarOrdenIA(transcripcion);
+        });
+    }
+
+    // Función que procesa el texto capturado llamando a servicios.js
+    function procesarOrdenIA(texto) {
+        console.log("Procesando orden:", texto);
+        
+        cerrarModal();
+
+        if (typeof procesarTextoConIA === 'function') {
+            procesarTextoConIA(texto);
+        } else {
+            console.error("❌ La función procesarTextoConIA no está disponible en servicios.js");
+            if (typeof mostrarToast === 'function') {
+                mostrarToast("Error: No se encontró la función de IA", "err");
+            }
+        }
     }
 });
 </script>
