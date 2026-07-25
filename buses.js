@@ -5,6 +5,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let listaBuses = [];
 let listaSalidas = [];
+let listaTrabajos = [];
 let mapaProductos = new Map(); 
 let timeoutBusqueda;
 
@@ -56,13 +57,14 @@ function formatoFechaVisual(fechaStr) {
 async function inicializarBuses() {
     try {
         console.time("⚡ Carga Paralela Supabase");
-        const [resBuses, resSalidas, resProductos] = await Promise.all([
+const [resBuses, resSalidas, resProductos, resTrabajos] = await Promise.all([
             supabaseClient
                 .from("buses")
                 .select("id, fecha, bus, placa, cliente, estado, foto")
                 .eq("estado", "ABIERTO"),
             supabaseClient.from("salidas").select("id, fecha, codigo, cantidad, hora, recibe, tipo, bus"),
-            supabaseClient.from("productos").select("codigo, descripcion, precio_venta")
+            supabaseClient.from("productos").select("codigo, descripcion, precio_venta"),
+            supabaseClient.from("trabajos").select("id, FECHA, N_BUS, TRABAJO, PLACA, tecnico")
         ]);
         console.timeEnd("⚡ Carga Paralela Supabase");
 
@@ -72,6 +74,7 @@ async function inicializarBuses() {
 
         listaBuses = resBuses.data || [];
         listaSalidas = resSalidas.data || [];
+        listaTrabajos = resTrabajos.data || [];
         
         mapaProductos.clear();
         (resProductos.data || []).forEach(p => mapaProductos.set(p.codigo, p));
@@ -79,7 +82,7 @@ async function inicializarBuses() {
         renderizarBuses(listaBuses);
     } catch (error) {
         console.error("Error cargando datos:", error);
-        mostrarToast('Error al cargar datos', 'err');
+        mostrarToast('Error al cargar datos de red', 'err');
     }
 }
 
@@ -101,13 +104,28 @@ function renderizarBuses(datosBuses) {
         salidasPorBus[s.bus].push(s);
     });
 
+    const trabajosPorBus = {};
+    listaTrabajos.forEach(t => {
+        const llaveBus = String(t.N_BUS || "").trim();
+        const llavePlaca = String(t.PLACA || "").trim();
+        if (llaveBus) {
+            if (!trabajosPorBus[llaveBus]) trabajosPorBus[llaveBus] = [];
+            trabajosPorBus[llaveBus].push(t);
+        } else if (llavePlaca) {
+            if (!trabajosPorBus[llavePlaca]) trabajosPorBus[llavePlaca] = [];
+            trabajosPorBus[llavePlaca].push(t);
+        }
+    });
+
     datosBuses.forEach(vehiculo => {
         const salidasDelBus = (salidasPorBus[vehiculo.id] || []).concat(salidasPorBus[vehiculo.bus] || []);
+        const trabajosDelBus = (trabajosPorBus[vehiculo.bus] || []).concat(trabajosPorBus[vehiculo.placa] || []);
         
         let totalAcumulado = 0;
         let tablaSalidasHtml = "";
         let tarjetasMovilHtml = "";
 
+        // 1. PRIMERO: RENDERIZAR PRODUCTOS/SALIDAS
         salidasDelBus.forEach(salida => {
             const prodReferencia = mapaProductos.get(salida.codigo);
             
@@ -117,11 +135,11 @@ function renderizarBuses(datosBuses) {
 
             if (prodReferencia) {
                 codigoMostrar = salida.codigo ?? "";
-                descripcionMostrar = prodReferencia.descripcion || "Sin descripción";
+                descripcionMostrar = prodReferencia.descripcion || "";
                 precioVenta = Number(prodReferencia.precio_venta ?? 0);
             } else {
                 codigoMostrar = ""; 
-                descripcionMostrar = salida.codigo || "Servicio / Mano de obra";
+                descripcionMostrar = salida.codigo || "";
                 precioVenta = 0;
             }
             
@@ -130,10 +148,11 @@ function renderizarBuses(datosBuses) {
             totalAcumulado += subtotal;
 
             const fechaFormateada = formatoFechaVisual(salida.fecha);
-            const horaFormateada = salida.hora ? salida.hora.slice(0, 5) : "---";
-            const quienRecibe = salida.recibe ?? "---";
+            const horaFormateada = salida.hora ? salida.hora.slice(0, 5) : "";
+            const quienRecibe = salida.recibe ?? "";
 
-            const celdaPrecioHtml = esTecnico ? "" : `<td class="precio">${formatoMoneda(precioVenta)}</td>`;
+            const precioMostrarStr = (precioVenta === 0) ? "" : formatoMoneda(precioVenta);
+            const celdaPrecioHtml = esTecnico ? "" : `<td class="precio">${precioMostrarStr}</td>`;
 
             tablaSalidasHtml += `
             <tr>
@@ -146,7 +165,7 @@ function renderizarBuses(datosBuses) {
                 <td class="col-recibe">${quienRecibe}</td>
             </tr>`;
 
-            const precioMovilHtml = esTecnico ? "" : ` &nbsp;|&nbsp; Precio: ${formatoMoneda(precioVenta)}`;
+            const precioMovilHtml = (esTecnico || precioVenta === 0) ? "" : ` &nbsp;|&nbsp; Precio: ${formatoMoneda(precioVenta)}`;
             const badgeCodigoHtml = codigoMostrar ? `<div class="salida-codigo-badge">${codigoMostrar}</div>` : '';
 
             tarjetasMovilHtml += `
@@ -155,16 +174,44 @@ function renderizarBuses(datosBuses) {
                 ${badgeCodigoHtml}
                 <div class="salida-sub">Cant: ${cantidadNum}${precioMovilHtml}</div>
                 <div class="salida-footer">
-                    <span>📅 ${fechaFormateada} - ${horaFormateada}</span>
-                    <span>👤 ${quienRecibe}</span>
+                    <span>📅 ${fechaFormateada} ${horaFormateada ? '- ' + horaFormateada : ''}</span>
+                    <span>${quienRecibe ? '👤 ' + quienRecibe : ''}</span>
                 </div>
             </div>`;
         });
 
-        if (salidasDelBus.length === 0) {
+        // 2. SEGUNDO: RENDERIZAR MANO DE OBRA / TRABAJOS
+        trabajosDelBus.forEach(trabajo => {
+            const fechaTrabajo = formatoFechaVisual(trabajo.FECHA);
+            const descTrabajo = trabajo.TRABAJO || "";
+            const tecnicoAsignado = trabajo.tecnico || "";
+
+            tablaSalidasHtml += `
+            <tr style="background: #f8fafc;">
+                <td>${fechaTrabajo}</td>
+                <td></td>
+                <td class="col-codigo">SERV</td>
+                <td class="col-descripcion">${descTrabajo}</td>
+                <td class="cantidad"></td>
+                ${esTecnico ? "" : `<td class="precio"></td>`}
+                <td class="col-recibe"></td>
+            </tr>`;
+
+            tarjetasMovilHtml += `
+            <div class="salida-card" style="border-left: 3px solid #3b82f6;">
+                <div class="salida-desc">${descTrabajo}</div>
+                <div class="salida-codigo-badge">MANO DE OBRA</div>
+                <div class="salida-footer">
+                    <span>📅 ${fechaTrabajo}</span>
+                    <span></span>
+                </div>
+            </div>`;
+        });
+
+        if (salidasDelBus.length === 0 && trabajosDelBus.length === 0) {
             const totalColumnas = esTecnico ? 6 : 7;
-            tablaSalidasHtml = `<tr><td colspan="${totalColumnas}" style="text-align:center; color:#284B87; font-weight:bold; padding:15px;">Sin salidas registradas para este bus</td></tr>`;
-            tarjetasMovilHtml = `<div style="text-align:center; color:#284B87; font-weight:bold; padding:10px; font-size:13px;">Sin salidas registradas para este bus</div>`;
+            tablaSalidasHtml = `<tr><td colspan="${totalColumnas}" style="text-align:center; color:#284B87; font-weight:bold; padding:15px;">Sin registros ni trabajos para este bus</td></tr>`;
+            tarjetasMovilHtml = `<div style="text-align:center; color:#284B87; font-weight:bold; padding:10px; font-size:13px;">Sin registros ni trabajos para este bus</div>`;
         }
 
         const imgHtml = vehiculo.foto 
@@ -181,10 +228,16 @@ function renderizarBuses(datosBuses) {
         const btnDeshabilitado = esFacturado ? "disabled" : "";
 
         const nombreEscapado = (vehiculo.bus ?? "Bus sin nombre").replace(/'/g, "\\'");
-        const placaEscapada = (vehiculo.placa ?? "---").replace(/'/g, "\\'");
+        const placaEscapada = (vehiculo.placa ?? "").replace(/'/g, "\\'");
 
         const textoTotalCabecera = esTecnico ? "" : ` &nbsp;|&nbsp; Total: ${formatoMoneda(totalAcumulado)}`;
         const thPrecioHtml = esTecnico ? "" : `<th style="text-align:right;">P VENTA</th>`;
+
+        // Lógica para mostrar Salidas o Servicios en la cabecera según corresponda
+        let textoConteoSecundario = `Salidas: ${salidasDelBus.length}`;
+        if (trabajosDelBus.length > 0) {
+            textoConteoSecundario = `Servicios: ${trabajosDelBus.length}`;
+        }
 
         const btnAdministrarHtml = `
             <button class="btn-facturar btn-administrar" onclick="event.stopPropagation(); abrirMenuAdministrar('${vehiculo.id}', event)">Administrar</button>
@@ -205,8 +258,8 @@ function renderizarBuses(datosBuses) {
                 <div class="bus-foto-wrapper" onclick="event.stopPropagation(); abrirVisorImagen('${vehiculo.foto}')">${imgHtml}</div>
                 <div class="bus-info-main">
                     <div class="bus-titulo">${vehiculo.bus ?? "Bus sin nombre"}</div>
-                    <div class="bus-detalles-linea1">Placa: ${vehiculo.placa ?? "---"} &nbsp;|&nbsp; Cliente: ${vehiculo.cliente ?? "---"}</div>
-                    <div class="bus-detalles-linea2">Salidas: ${salidasDelBus.length}${textoTotalCabecera}</div>
+                    <div class="bus-detalles-linea1">Placa: ${vehiculo.placa ?? ""} &nbsp;|&nbsp; Cliente: ${vehiculo.cliente ?? ""}</div>
+                    <div class="bus-detalles-linea2">${textoConteoSecundario}${textoTotalCabecera}</div>
                 </div>
                 <div class="bus-flecha">▼</div>
             </div>
@@ -222,7 +275,7 @@ function renderizarBuses(datosBuses) {
                     </table>
                 </div>
                 <div class="mobile-cards-salidas">${tarjetasMovilHtml}</div>
-                ${btnFacturarHtml}
+                {btnFacturarHtml}
             </div>
         </div>`;
     });
@@ -282,12 +335,13 @@ function prepararYRedireccionarFacturacion(idBus, nombreBus, placaBus) {
         if (!vehiculo) return;
 
         const salidasDelBus = listaSalidas.filter(s => String(s.bus) === String(idBus) || String(s.bus) === String(vehiculo.bus));
+        const trabajosDelBus = listaTrabajos.filter(t => String(t.N_BUS) === String(vehiculo.bus) || String(t.PLACA) === String(vehiculo.placa));
 
-        const itemsMapeados = salidasDelBus.map(salida => {
+        const itemsSalidas = salidasDelBus.map(salida => {
             const prodReferencia = mapaProductos.get(salida.codigo);
             
             const codigoFinal = prodReferencia ? salida.codigo : '';
-            const descripcionFinal = prodReferencia ? prodReferencia.descripcion : (salida.codigo || 'Servicio / Mano de obra');
+            const descripcionFinal = prodReferencia ? prodReferencia.descripcion : (salida.codigo || '');
             const precioFinal = prodReferencia ? parseFloat(prodReferencia.precio_venta) : 0;
             const esServicio = !prodReferencia || (salida.codigo && salida.codigo.startsWith('SR'));
 
@@ -300,6 +354,19 @@ function prepararYRedireccionarFacturacion(idBus, nombreBus, placaBus) {
                 tipo: esServicio ? 'SERVICIO' : 'PRODUCTO'
             };
         });
+
+        const itemsTrabajos = trabajosDelBus.map(trabajo => {
+            return {
+                codigo: 'SERV',
+                descripcion: trabajo.TRABAJO || '',
+                cantidad: 1,
+                precio_unitario: 0,
+                descuento: 0,
+                tipo: 'SERVICIO'
+            };
+        });
+
+        const itemsMapeados = [...itemsSalidas, ...itemsTrabajos];
 
         const datosFacturacion = {
             cliente: {

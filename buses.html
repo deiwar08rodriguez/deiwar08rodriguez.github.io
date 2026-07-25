@@ -169,6 +169,40 @@
 
         .bus-item.abierto .bus-detalle-panel { display: block; }
 
+        /* --- 📑 PESTAÑAS INTERNAS (INVENTARIO / SERVICIOS) --- */
+        .panel-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 8px;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            font-size: 14px;
+            font-weight: bold;
+            color: #64748b;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background: #284B87;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
         .table-container {
             border-radius: 8px;
             overflow: auto;
@@ -482,7 +516,6 @@
                 <div class="preview-camera-box" id="previewEditFoto">
                     <span id="iconEditCamara" style="font-size: 32px;">📸</span>
                 </div>
-                <!-- ID lblTextoFoto agregado para actualización dinámica desde JavaScript -->
                 <span id="lblTextoFoto" style="font-size: 13px; color: #284B87; font-weight: bold; cursor: pointer;">CAMBIAR FOTO</span>
             </div>
 
