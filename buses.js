@@ -233,7 +233,6 @@ function renderizarBuses(datosBuses) {
         const textoTotalCabecera = esTecnico ? "" : ` &nbsp;|&nbsp; Total: ${formatoMoneda(totalAcumulado)}`;
         const thPrecioHtml = esTecnico ? "" : `<th style="text-align:right;">P VENTA</th>`;
 
-        // Lógica para mostrar Salidas o Servicios en la cabecera según corresponda
         let textoConteoSecundario = `Salidas: ${salidasDelBus.length}`;
         if (trabajosDelBus.length > 0) {
             textoConteoSecundario = `Servicios: ${trabajosDelBus.length}`;
@@ -275,7 +274,7 @@ function renderizarBuses(datosBuses) {
                     </table>
                 </div>
                 <div class="mobile-cards-salidas">${tarjetasMovilHtml}</div>
-                {btnFacturarHtml}
+                ${btnFacturarHtml}
             </div>
         </div>`;
     });
