@@ -14,12 +14,12 @@
             box-sizing: border-box;
         }
 
-        /* 🔤 Forzar mayúsculas visuales en todos los campos de texto */
+        /* Forzar mayúsculas visuales en todos los campos de texto */
         input[type="text"] {
             text-transform: uppercase;
         }
 
-        /* --- 🖥️ DISEÑO BASE PARA COMPUTADORA --- */
+        /* --- DISEÑO BASE PARA COMPUTADORA --- */
         body {
             background: #203764;
             font-family: Calibri, "Segoe UI", Arial, sans-serif;
@@ -50,7 +50,55 @@
             box-shadow: 0 18px 45px rgba(0, 0, 0, .25);
         }
 
-        h2 { color: #203764; margin-bottom: 24px; font-size: 34px; font-weight: normal; }
+        h2 { color: #203764; margin-bottom: 20px; font-size: 34px; font-weight: normal; }
+
+        /* --- ESTILOS DE PESTAÑAS PRINCIPALES (ACTIVOS / HISTORIAL) --- */
+        .main-tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+        }
+
+        .main-tab-btn {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            font-size: 15px;
+            font-weight: bold;
+            color: #475569;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .main-tab-btn:hover {
+            background: #e2e8f0;
+            color: #203764;
+        }
+
+        .main-tab-btn.active {
+            background: #203764;
+            color: white;
+            border-color: #203764;
+            box-shadow: 0 4px 10px rgba(32, 55, 100, 0.2);
+        }
+
+        .main-tab-btn .badge-count {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .main-tab-btn:not(.active) .badge-count {
+            background: #cbd5e1;
+            color: #1e293b;
+        }
 
         #txtBuscar {
             width: 100%;
@@ -81,11 +129,51 @@
             overflow: hidden;
             background: white;
             box-shadow: 0 4px 10px rgba(0,0,0,0.03);
-            transition: box-shadow 0.2s;
+            transition: box-shadow 0.2s, border-color 0.2s;
         }
 
         .bus-item:hover {
             box-shadow: 0 6px 15px rgba(32, 55, 100, 0.1);
+        }
+
+        /* ESTADO ACTIVO/ABIERTO DE LA TARJETA */
+        .bus-item.abierto {
+            border-color: #284B87;
+        }
+
+        /* INDICADOR VISUAL PARA BUSES EN HISTORIAL (NO ACTIVOS) */
+        .bus-item.estado-inactivo {
+            opacity: 0.85;
+        }
+
+        .bus-item.estado-inactivo .bus-header {
+            background: #f8fafc;
+        }
+
+        .bus-estado-badge {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: bold;
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin-left: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-facturado {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-archivado {
+            background: #fee2e2;
+            color: #7f1d1d;
+        }
+
+        .badge-otro {
+            background: #fef3c7;
+            color: #78350f;
         }
 
         .bus-header {
@@ -99,6 +187,11 @@
         .bus-header:hover {
             background: #dfe9ff;
             transition: background 0.15s;
+        }
+
+        /* RESALTAR CABECERA SOLO CUANDO LA TARJETA ESTÁ ABIERTA */
+        .bus-item.abierto .bus-header {
+            background: #f0f5ff;
         }
 
         .bus-foto-wrapper {
@@ -169,7 +262,7 @@
 
         .bus-item.abierto .bus-detalle-panel { display: block; }
 
-        /* --- 📑 PESTAÑAS INTERNAS (INVENTARIO / SERVICIOS) --- */
+        /* --- PESTAÑAS INTERNAS DE TARJETA --- */
         .panel-tabs {
             display: flex;
             gap: 10px;
@@ -190,7 +283,19 @@
             transition: all 0.2s;
         }
 
+        /* Estilo general para pestañas inactivas dentro del panel */
+        .tab-btn:hover {
+            color: #284B87;
+            background: #e2e8f0;
+        }
+
+        /* CORTAR VISUALMENTE EL ESTADO ACTIVO SOLO SI EL PADRE ESTÁ ABIERTO */
         .tab-btn.active {
+            background: #cbd5e1;
+            color: #475569;
+        }
+
+        .bus-item.abierto .tab-btn.active {
             background: #284B87;
             color: white;
         }
@@ -254,11 +359,17 @@
             background: #203764; 
         }
 
+        .btn-administrar {
+            background: #3b82f6;
+        }
+
+        .btn-administrar:hover {
+            background: #1d4ed8;
+        }
+
         .mobile-cards-salidas { display: none; }
 
-        /* ═══════════════════════════════════
-           MENÚ CONTEXTUAL (DOBLE CLIC)
-           ═══════════════════════════════════ */
+        /* --- MENÚ CONTEXTUAL --- */
         #menuContextual {
             display: none;
             position: fixed;
@@ -286,9 +397,7 @@
         .menu-item.danger:hover { background: #fef2f2; }
         .menu-sep { height: 1px; background: #f1f5f9; margin: 0; }
 
-        /* ═══════════════════════════════════
-           SHEET MODAL PARA EDITAR / CREAR BUS
-           ═══════════════════════════════════ */
+        /* --- SHEET MODAL PARA EDITAR / CREAR BUS --- */
         #overlaySheet {
             display: none;
             position: fixed;
@@ -399,18 +508,6 @@
             position: relative;
             z-index: 1;
         }
-        .preview-camera-box::before {
-            content: ''; 
-            position: absolute; 
-            top: 6px; 
-            left: 6px; 
-            right: 6px; 
-            bottom: 6px; 
-            border: 2px solid transparent; 
-            border-image: linear-gradient(to bottom right, #ffffff 15%, transparent 16%, transparent 84%, #ffffff 85%) 1; 
-            pointer-events: none; 
-            z-index: 5;
-        }
 
         .btn-confirmar {
             width: 100%;
@@ -430,9 +527,7 @@
             cursor: not-allowed;
         }
 
-        /* ═══════════════════════════════════
-           TOAST
-           ═══════════════════════════════════ */
+        /* --- TOAST --- */
         #toast {
             position: fixed;
             bottom: 90px;
@@ -452,7 +547,7 @@
         }
         #toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-        /* 📱 REGLAS CELULAR */
+        /* --- REGLAS CELULAR --- */
         @media (max-width: 768px) {
             body { background: white; }
             header { background: #203764; height: 65px; padding: 0 15px; }
@@ -496,6 +591,17 @@
 
     <main>
         <h2>Monitoreo de Buses</h2>
+
+        <!-- TABS DE BUSES ACTIVOS E HISTORIAL -->
+        <div class="main-tabs" id="tabsBuses">
+            <button class="main-tab-btn active" data-tab="activos" onclick="cambiarTabBuses('activos')">
+                <span>Buses Activos</span>
+            </button>
+            <button class="main-tab-btn" data-tab="historial" onclick="cambiarTabBuses('historial')">
+                <span>Historial de Buses</span>
+            </button>
+        </div>
+
         <input type="text" id="txtBuscar" placeholder="BUSCAR POR BUS, PLACA O CLIENTE...">
         <div class="lista-buses" id="contenedorBuses"></div>
     </main>
@@ -514,7 +620,7 @@
             <div class="campo-foto" onclick="document.getElementById('editFoto').click()" title="Haz clic para seleccionar o tomar foto">
                 <input type="file" id="editFoto" accept="image/*" style="display: none;">
                 <div class="preview-camera-box" id="previewEditFoto">
-                    <span id="iconEditCamara" style="font-size: 32px;">📸</span>
+                    <span id="iconEditCamara" style="font-size: 13px; font-weight: bold; color: #284B87;">FOTO</span>
                 </div>
                 <span id="lblTextoFoto" style="font-size: 13px; color: #284B87; font-weight: bold; cursor: pointer;">CAMBIAR FOTO</span>
             </div>
@@ -538,11 +644,11 @@
         </div>
     </div>
 
-<!-- MENÚ CONTEXTUAL DOBLE CLIC -->
+    <!-- MENÚ CONTEXTUAL DOBLE CLIC -->
     <div id="menuContextual">
-        <div class="menu-item" onclick="editarBusDesdeMenu()">✏️ Editar</div>
+        <div class="menu-item" onclick="editarBusDesdeMenu()">Editar</div>
         <div class="menu-sep"></div>
-        <div class="menu-item danger" onclick="archivarBusDesdeMenu()">📦 Archivar</div>
+        <div class="menu-item danger" id="btnAccionArchivar" onclick="archivarBusDesdeMenu()">Archivar</div>
     </div>
 
     <!-- VISOR DE IMAGEN -->
@@ -554,7 +660,34 @@
     <div id="toast"></div>
 
     <script>
-        // --- 🔤 CONVERSIÓN AUTOMÁTICA A MAYÚSCULAS EN TIEMPO REAL ---
+        // ESTADO GLOBAL DE PESTAÑA SELECCIONADA
+        window.tabBusActual = 'activos';
+
+        function cambiarTabBuses(tab) {
+            window.tabBusActual = tab;
+            document.querySelectorAll('.main-tab-btn').forEach(btn => {
+                if (btn.dataset.tab === tab) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+
+            // Cambiar texto de la opción del menú contextual si es necesario
+            const btnArchivar = document.getElementById('btnAccionArchivar');
+            if (btnArchivar) {
+                btnArchivar.innerText = (tab === 'activos') ? 'Archivar' : 'Desarchivar';
+            }
+
+            // Invocar la carga o renderizado de buses si la función existe en buses.js
+            if (typeof cargarBuses === 'function') {
+                cargarBuses();
+            } else if (typeof renderizarBuses === 'function') {
+                renderizarBuses();
+            }
+        }
+
+        // --- CONVERSIÓN AUTOMÁTICA A MAYÚSCULAS EN TIEMPO REAL ---
         document.addEventListener("input", function (e) {
             if (e.target.tagName === "INPUT" && e.target.type === "text") {
                 const start = e.target.selectionStart;
@@ -564,7 +697,7 @@
             }
         });
 
-        // --- 🛡️ CONTROL DE ACCESO Y ROL EN VISTA ---
+        // --- CONTROL DE ACCESO Y ROL EN VISTA ---
         (function() {
             const sessionUser = sessionStorage.getItem("session_user");
             const sessionArea = sessionStorage.getItem("session_area");

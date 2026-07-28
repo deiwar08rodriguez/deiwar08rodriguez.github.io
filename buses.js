@@ -3,7 +3,8 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let listaBuses = [];
+let listaBusesActivos = [];
+let listaBusesHistorial = [];
 let listaSalidas = [];
 let listaTrabajos = [];
 let mapaProductos = new Map(); 
@@ -12,6 +13,10 @@ let timeoutBusqueda;
 // VARIABLES GLOBALES DE EDICIÓN Y GESTIÓN
 let busEnContexto = null;
 let fotoEditarFile = null;
+let touchStartX = 0;
+let touchStartY = 0;
+let touchItem = null;
+let touchPreventClick = false;
 
 // VISOR DE IMAGEN
 function abrirVisorImagen(urlFoto) {
@@ -52,50 +57,67 @@ function formatoFechaVisual(fechaStr) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// CARGA INICIAL DE DATOS (Solo estado ABIERTO)
+// CARGA INICIAL DE DATOS
 // ═══════════════════════════════════════════════════════════
 async function inicializarBuses() {
     try {
         console.time("⚡ Carga Paralela Supabase");
-const [resBuses, resSalidas, resProductos, resTrabajos] = await Promise.all([
+        const [resBuses, resSalidas, resProductos, resTrabajos] = await Promise.all([
             supabaseClient
                 .from("buses")
-                .select("id, fecha, bus, placa, cliente, estado, foto")
-                .eq("estado", "ABIERTO"),
+                .select("id, fecha, bus, placa, cliente, estado, foto"),
             supabaseClient.from("salidas").select("id, fecha, codigo, cantidad, hora, recibe, tipo, bus"),
             supabaseClient.from("productos").select("codigo, descripcion, precio_venta"),
             supabaseClient.from("trabajos").select("id, FECHA, N_BUS, TRABAJO, PLACA, tecnico")
         ]);
         console.timeEnd("⚡ Carga Paralela Supabase");
 
-        if (resBuses.error || resSalidas.error || resProductos.error) {
-            throw resBuses.error || resSalidas.error || resProductos.error;
-        }
+        const errorConsulta = resBuses.error || resSalidas.error || resProductos.error || resTrabajos.error;
+        if (errorConsulta) throw errorConsulta;
 
-        listaBuses = resBuses.data || [];
+        const todosBuses = resBuses.data || [];
+        listaBusesActivos = todosBuses.filter(b => b.estado === "ABIERTO");
+        listaBusesHistorial = todosBuses.filter(b => b.estado !== "ABIERTO");
+        
         listaSalidas = resSalidas.data || [];
         listaTrabajos = resTrabajos.data || [];
         
         mapaProductos.clear();
         (resProductos.data || []).forEach(p => mapaProductos.set(p.codigo, p));
 
-        renderizarBuses(listaBuses);
+        renderizarBuses();
     } catch (error) {
         console.error("Error cargando datos:", error);
         mostrarToast('Error al cargar datos de red', 'err');
     }
 }
 
-function renderizarBuses(datosBuses) {
+// Obtener lista según pestaña activa
+function obtenerListaBusesActual() {
+    return window.tabBusActual === 'activos' ? listaBusesActivos : listaBusesHistorial;
+}
+
+// RENDERIZAR BUSES (Actualizado)
+function renderizarBuses(datosBuses = null) {
     const contenedor = document.getElementById("contenedorBuses");
     if (!contenedor) return;
+
+    // Si no pasan datos, usar la lista según la pestaña activa
+    if (datosBuses === null) {
+        datosBuses = obtenerListaBusesActual();
+    }
+
     if (datosBuses.length === 0) {
-        contenedor.innerHTML = `<p style="text-align:center; color:#284B87; padding:20px; font-weight:bold;">No se encontraron registros.</p>`;
+        const mensajeVacio = window.tabBusActual === 'activos' 
+            ? "No hay buses activos registrados."
+            : "No hay historial de buses disponible.";
+        contenedor.innerHTML = `<p style="text-align:center; color:#284B87; padding:20px; font-weight:bold;">${mensajeVacio}</p>`;
         return;
     }
 
     const sessionArea = sessionStorage.getItem("session_area") || "";
     const esTecnico = sessionArea.toLowerCase().trim() === "tecnico";
+    const esHistorial = window.tabBusActual === 'historial';
 
     let html = "";
     const salidasPorBus = {};
@@ -125,7 +147,7 @@ function renderizarBuses(datosBuses) {
         let tablaSalidasHtml = "";
         let tarjetasMovilHtml = "";
 
-        // 1. PRIMERO: RENDERIZAR PRODUCTOS/SALIDAS
+        // 1. RENDERIZAR PRODUCTOS/SALIDAS
         salidasDelBus.forEach(salida => {
             const prodReferencia = mapaProductos.get(salida.codigo);
             
@@ -180,11 +202,10 @@ function renderizarBuses(datosBuses) {
             </div>`;
         });
 
-        // 2. SEGUNDO: RENDERIZAR MANO DE OBRA / TRABAJOS
+        // 2. RENDERIZAR MANO DE OBRA / TRABAJOS
         trabajosDelBus.forEach(trabajo => {
             const fechaTrabajo = formatoFechaVisual(trabajo.FECHA);
             const descTrabajo = trabajo.TRABAJO || "";
-            const tecnicoAsignado = trabajo.tecnico || "";
 
             tablaSalidasHtml += `
             <tr style="background: #f8fafc;">
@@ -238,6 +259,18 @@ function renderizarBuses(datosBuses) {
             textoConteoSecundario = `Servicios: ${trabajosDelBus.length}`;
         }
 
+        // BADGE DE ESTADO (en historial)
+        let badgeEstadoHtml = "";
+        if (esHistorial) {
+            let claseEstado = "badge-otro";
+            if (vehiculo.estado === "FACTURADO" || vehiculo.estado === "FACTURADO_INTERNO") {
+                claseEstado = "badge-facturado";
+            } else if (vehiculo.estado === "ARCHIVADO") {
+                claseEstado = "badge-archivado";
+            }
+            badgeEstadoHtml = `<span class="bus-estado-badge ${claseEstado}">${vehiculo.estado}</span>`;
+        }
+
         const btnAdministrarHtml = `
             <button class="btn-facturar btn-administrar" onclick="event.stopPropagation(); abrirMenuAdministrar('${vehiculo.id}', event)">Administrar</button>
         `;
@@ -246,17 +279,19 @@ function renderizarBuses(datosBuses) {
         <div class="panel-acciones" style="display:flex; justify-content:flex-start; margin-top:10px;">
             ${btnAdministrarHtml}
         </div>` : `
-        <div class="panel-acciones" style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+        <div class="panel-acciones" style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; flex-wrap:wrap; gap:10px;">
             ${btnAdministrarHtml}
-            <button class="btn-facturar" style="${btnEstilo}" ${btnDeshabilitado} id="btn-fac-${vehiculo.id}" onclick="event.stopPropagation(); prepararYRedireccionarFacturacion('${vehiculo.id}', '${nombreEscapado}', '${placaEscapada}')">${btnTexto}</button>
+            ${!esHistorial ? `<button class="btn-facturar" style="${btnEstilo}" ${btnDeshabilitado} id="btn-fac-${vehiculo.id}" onclick="event.stopPropagation(); prepararYRedireccionarFacturacion('${vehiculo.id}', '${nombreEscapado}', '${placaEscapada}')">${btnTexto}</button>` : ''}
         </div>`;
 
+        const claseItemHistorial = esHistorial ? 'estado-inactivo' : '';
+
         html += `
-        <div class="bus-item" id="bus-${vehiculo.id}" data-bus-id="${vehiculo.id}">
+        <div class="bus-item ${claseItemHistorial}" id="bus-${vehiculo.id}" data-bus-id="${vehiculo.id}">
             <div class="bus-header" data-bus-id="${vehiculo.id}">
                 <div class="bus-foto-wrapper" onclick="event.stopPropagation(); abrirVisorImagen('${vehiculo.foto}')">${imgHtml}</div>
                 <div class="bus-info-main">
-                    <div class="bus-titulo">${vehiculo.bus ?? "Bus sin nombre"}</div>
+                    <div class="bus-titulo">${vehiculo.bus ?? "Bus sin nombre"}${badgeEstadoHtml}</div>
                     <div class="bus-detalles-linea1">Placa: ${vehiculo.placa ?? ""} &nbsp;|&nbsp; Cliente: ${vehiculo.cliente ?? ""}</div>
                     <div class="bus-detalles-linea2">${textoConteoSecundario}${textoTotalCabecera}</div>
                 </div>
@@ -283,14 +318,63 @@ function renderizarBuses(datosBuses) {
     bindClickHandlers();
 }
 
+// MANEJO DE SWIPE Y LONG PRESS PARA MÓVILES
+function inicializarGestosItem(item) {
+    let pressTimer = null;
+
+    item.addEventListener('touchstart', (e) => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        touchItem = item;
+        touchPreventClick = false;
+
+        pressTimer = setTimeout(() => {
+            touchPreventClick = true;
+            const idBus = item.dataset.busId;
+            const touch = e.touches[0];
+            abrirMenuAdministrar(idBus, { clientX: touch.clientX, clientY: touch.clientY });
+        }, 500);
+    }, { passive: true });
+
+    item.addEventListener('touchmove', (e) => {
+        const moveX = e.touches[0].clientX;
+        const moveY = e.touches[0].clientY;
+        const diffX = moveX - touchStartX;
+        const diffY = moveY - touchStartY;
+
+        if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
+            if (pressTimer) clearTimeout(pressTimer);
+        }
+
+        if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 30) {
+            if (diffX < -50) {
+                item.style.transform = 'translateX(-60px)';
+                item.style.transition = 'transform 0.2s ease';
+            } else if (diffX > 50) {
+                item.style.transform = 'translateX(0px)';
+                item.style.transition = 'transform 0.2s ease';
+            }
+        }
+    }, { passive: true });
+
+    item.addEventListener('touchend', () => {
+        if (pressTimer) clearTimeout(pressTimer);
+    }, { passive: true });
+}
+
 // BIND: MANEJO DIRECTO DE CLIC EN ACORDEÓN
 function bindClickHandlers() {
     document.querySelectorAll('.bus-header').forEach(header => {
         header.addEventListener('click', handleBusClick);
+        inicializarGestosItem(header);
     });
 }
 
 function handleBusClick(e) {
+    if (touchPreventClick) {
+        touchPreventClick = false;
+        return;
+    }
     const idBus = e.currentTarget.dataset.busId;
     if (!idBus) return;
     toggleAcordeonBuses(`bus-${idBus}`);
@@ -315,12 +399,15 @@ if (txtBuscar) {
 
         timeoutBusqueda = setTimeout(() => {
             if (texto === "") {
-                renderizarBuses(listaBuses);
+                renderizarBuses();
                 return;
             }
-            const filtrados = listaBuses.filter(b => 
+            
+            const listaActual = obtenerListaBusesActual();
+            const filtrados = listaActual.filter(b => 
                 String(b.bus ?? "").toUpperCase().includes(texto) ||
-                String(b.placa ?? "").toUpperCase().includes(texto)
+                String(b.placa ?? "").toUpperCase().includes(texto) ||
+                String(b.cliente ?? "").toUpperCase().includes(texto)
             );
             renderizarBuses(filtrados);
         }, 100);
@@ -330,7 +417,8 @@ if (txtBuscar) {
 // PREPARAR FACTURACIÓN
 function prepararYRedireccionarFacturacion(idBus, nombreBus, placaBus) {
     try {
-        const vehiculo = listaBuses.find(b => b.id === idBus);
+        const listaActual = obtenerListaBusesActual();
+        const vehiculo = listaActual.find(b => b.id === idBus);
         if (!vehiculo) return;
 
         const salidasDelBus = listaSalidas.filter(s => String(s.bus) === String(idBus) || String(s.bus) === String(vehiculo.bus));
@@ -392,7 +480,8 @@ function prepararYRedireccionarFacturacion(idBus, nombreBus, placaBus) {
 
 // MENÚ DE ADMINISTRACIÓN DESDE EL BOTÓN
 function abrirMenuAdministrar(idBus, event) {
-    busEnContexto = listaBuses.find(b => String(b.id) === String(idBus));
+    const listaActual = obtenerListaBusesActual();
+    busEnContexto = listaActual.find(b => String(b.id) === String(idBus));
     if (!busEnContexto) return;
 
     const menu = document.getElementById('menuContextual');
@@ -417,13 +506,17 @@ function ocultarMenuContextual() {
     if (menu) menu.classList.remove('visible');
 }
 
-// Cerrar menú al hacer clic fuera
+// Cerrar menú al interactuar fuera o hacer scroll
 document.addEventListener('click', (e) => {
     const menu = document.getElementById('menuContextual');
     if (menu && menu.classList.contains('visible') && !menu.contains(e.target)) {
         ocultarMenuContextual();
     }
 });
+
+window.addEventListener('scroll', () => {
+    ocultarMenuContextual();
+}, { passive: true });
 
 // ═══════════════════════════════════════════════════════════
 // EDITAR / REGISTRAR BUS (SHEET)
@@ -581,12 +674,22 @@ if (btnConfirmarEdicion) {
 
                 if (error) throw error;
 
-                const busLocal = listaBuses.find(b => b.id === busEnContexto.id);
-                if (busLocal) {
-                    busLocal.bus = nombreNuevo;
-                    busLocal.placa = placaNueva;
-                    busLocal.cliente = clienteNuevo;
-                    busLocal.foto = fotoUrl;
+                // Actualizar en ambas listas
+                const busEnActivos = listaBusesActivos.find(b => b.id === busEnContexto.id);
+                const busEnHistorial = listaBusesHistorial.find(b => b.id === busEnContexto.id);
+                
+                if (busEnActivos) {
+                    busEnActivos.bus = nombreNuevo;
+                    busEnActivos.placa = placaNueva;
+                    busEnActivos.cliente = clienteNuevo;
+                    busEnActivos.foto = fotoUrl;
+                }
+                
+                if (busEnHistorial) {
+                    busEnHistorial.bus = nombreNuevo;
+                    busEnHistorial.placa = placaNueva;
+                    busEnHistorial.cliente = clienteNuevo;
+                    busEnHistorial.foto = fotoUrl;
                 }
 
                 mostrarToast('Bus actualizado correctamente', 'ok');
@@ -622,12 +725,12 @@ if (btnConfirmarEdicion) {
 
                 if (error) throw error;
 
-                listaBuses.unshift(nuevoBusObj);
+                listaBusesActivos.unshift(nuevoBusObj);
                 mostrarToast('Bus creado exitosamente', 'ok');
             }
 
             cerrarSheetEdicion();
-            renderizarBuses(listaBuses);
+            renderizarBuses();
 
         } catch (err) {
             console.error('Error guardando bus:', err);
@@ -640,14 +743,17 @@ if (btnConfirmarEdicion) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// ARCHIVAR BUS DESDE EL MENÚ CONTEXTUAL
+// ARCHIVAR / DESARCHIVAR BUS DESDE EL MENÚ CONTEXTUAL
 // ═══════════════════════════════════════════════════════════
 async function archivarBusDesdeMenu() {
     ocultarMenuContextual();
     if (!busEnContexto) return;
 
     const busNombre = busEnContexto.bus || 'este bus';
-    const mensaje = `¿Estás seguro de que deseas archivar "${busNombre}"? Dejará de aparecer en la lista.`;
+    const esHistorial = window.tabBusActual === 'historial';
+    const mensaje = esHistorial 
+        ? `¿Estás seguro de que deseas DESARCHIVAR "${busNombre}"? Volverá a la lista de buses activos.`
+        : `¿Estás seguro de que deseas ARCHIVAR "${busNombre}"? Dejará de aparecer en la lista activa.`;
 
     let seguro = false;
     if (typeof confirmarArchivarUI === "function") {
@@ -659,24 +765,38 @@ async function archivarBusDesdeMenu() {
     if (!seguro) return;
 
     try {
+        const nuevoEstado = esHistorial ? "ABIERTO" : "ARCHIVADO";
+        
         const { error } = await supabaseClient
             .from("buses")
-            .update({ estado: "ARCHIVADO" })
+            .update({ estado: nuevoEstado })
             .eq("id", busEnContexto.id);
 
         if (error) throw error;
 
-        listaBuses = listaBuses.filter(b => b.id !== busEnContexto.id);
-        renderizarBuses(listaBuses);
+        // Mover bus entre listas
+        if (esHistorial) {
+            // Mover de historial a activos
+            listaBusesHistorial = listaBusesHistorial.filter(b => b.id !== busEnContexto.id);
+            busEnContexto.estado = "ABIERTO";
+            listaBusesActivos.unshift(busEnContexto);
+            mostrarToast("Bus desarchivado correctamente", "ok");
+        } else {
+            // Mover de activos a historial
+            listaBusesActivos = listaBusesActivos.filter(b => b.id !== busEnContexto.id);
+            busEnContexto.estado = "ARCHIVADO";
+            listaBusesHistorial.unshift(busEnContexto);
+            mostrarToast("Bus archivado correctamente", "ok");
+        }
 
-        mostrarToast("Bus archivado correctamente", "ok");
+        renderizarBuses();
     } catch (err) {
-        console.error("Error al archivar bus:", err);
-        mostrarToast("Error al archivar el bus: " + (err.message || ""), "err");
+        console.error("Error al archivar/desarchivar bus:", err);
+        mostrarToast("Error al archivar/desarchivar el bus: " + (err.message || ""), "err");
     }
 }
 
-// Modal personalizado de confirmación (Archivar)
+// Modal personalizado de confirmación (Archivar/Desarchivar)
 function confirmarArchivarUI(mensaje) {
     return new Promise((resolve) => {
         let modal = document.getElementById('modalConfirmarArchivar');
@@ -692,11 +812,11 @@ function confirmarArchivarUI(mensaje) {
             `;
             modal.innerHTML = `
                 <div style="background: white; border-radius: 12px; padding: 20px 24px; max-width: 360px; width: 90%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
-                    <h4 style="margin: 0 0 8px 0; color: #0f172a; font-size: 16px;">¿Archivar bus?</h4>
+                    <h4 style="margin: 0 0 8px 0; color: #0f172a; font-size: 16px;">Confirmar acción</h4>
                     <p id="msgConfirmarArchivar" style="margin: 0 0 20px 0; color: #64748b; font-size: 14px; line-height: 1.4;"></p>
                     <div style="display: flex; justify-content: flex-end; gap: 10px;">
                         <button id="btnCancelArch" style="padding: 8px 14px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; color: #475569; font-weight: 600; cursor: pointer;">Cancelar</button>
-                        <button id="btnOkArch" style="padding: 8px 14px; border-radius: 6px; border: none; background: #f59e0b; color: white; font-weight: 600; cursor: pointer;">Archivar</button>
+                        <button id="btnOkArch" style="padding: 8px 14px; border-radius: 6px; border: none; background: #f59e0b; color: white; font-weight: 600; cursor: pointer;">Confirmar</button>
                     </div>
                 </div>
             `;
@@ -737,7 +857,6 @@ const sheetHandle = document.getElementById('sheetHandle');
 if (sheetHandle) sheetHandle.addEventListener('click', cerrarSheetEdicion);
 
 document.addEventListener("DOMContentLoaded", () => {
-    // Vincular botón flotante "+" con abrir el modal en modo "Nuevo Bus"
     const btnAbrirFlotante = document.getElementById('btnAbrirFlotante');
     if (btnAbrirFlotante) {
         btnAbrirFlotante.addEventListener('click', () => abrirSheetEdicion(null));
