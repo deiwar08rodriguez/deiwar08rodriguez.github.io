@@ -530,25 +530,16 @@ function editarBusDesdeMenu() {
 function abrirSheetEdicion(bus = null) {
     fotoEditarFile = null;
 
-    const lblTextoFoto = document.getElementById('lblTextoFoto');
     const previewBox = document.getElementById('previewEditFoto');
     const iconCamara = document.getElementById('iconEditCamara');
     const sheetTitulo = document.getElementById('sheetTitulo');
     const btnConfirmar = document.getElementById('btnConfirmarEdicion');
-    const editFotoInput = document.getElementById('editFoto');
 
     if (bus) {
         // --- MODO EDICIÓN ---
         busEnContexto = bus;
         if (sheetTitulo) sheetTitulo.textContent = 'Editar Bus';
         if (btnConfirmar) btnConfirmar.textContent = 'Guardar cambios';
-        if (lblTextoFoto) lblTextoFoto.textContent = 'SELECCIONAR / CAMBIAR FOTO';
-
-        // En edición permite elegir foto desde archivo/galería (sin forzar cámara)
-        if (editFotoInput) {
-            editFotoInput.removeAttribute('capture');
-            editFotoInput.value = '';
-        }
 
         document.getElementById('editBus').value = bus.bus || '';
         document.getElementById('editPlaca').value = bus.placa || '';
@@ -571,13 +562,6 @@ function abrirSheetEdicion(bus = null) {
         busEnContexto = null;
         if (sheetTitulo) sheetTitulo.textContent = 'Nuevo Bus';
         if (btnConfirmar) btnConfirmar.textContent = 'Registrar Bus';
-        if (lblTextoFoto) lblTextoFoto.textContent = 'TOMAR FOTO';
-
-        // En registro abre la cámara trasera directamente en móviles
-        if (editFotoInput) {
-            editFotoInput.setAttribute('capture', 'environment');
-            editFotoInput.value = '';
-        }
 
         document.getElementById('editBus').value = '';
         document.getElementById('editPlaca').value = '';
@@ -607,26 +591,62 @@ function cerrarSheetEdicion() {
     busEnContexto = null;
 }
 
-// Manejo de cambio/captura de foto en el sheet
+// ═══════════════════════════════════════════════════════════
+// MANEJO DE BOTONES TOMAR FOTO Y ELEGIR GALERÍA
+// ═══════════════════════════════════════════════════════════
+const btnTomarFoto = document.getElementById('btnTomarFoto');
+const btnElegirFoto = document.getElementById('btnElegirFoto');
 const editFotoInput = document.getElementById('editFoto');
+const editFotoGaleriaInput = document.getElementById('editFotoGaleria');
+
+if (btnTomarFoto) {
+    btnTomarFoto.addEventListener('click', (e) => {
+        e.preventDefault();
+        editFotoInput.setAttribute('capture', 'environment');
+        editFotoInput.click();
+    });
+}
+
+if (btnElegirFoto) {
+    btnElegirFoto.addEventListener('click', (e) => {
+        e.preventDefault();
+        editFotoGaleriaInput.removeAttribute('capture');
+        editFotoGaleriaInput.click();
+    });
+}
+
+// Procesar foto tomada con cámara
 if (editFotoInput) {
     editFotoInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
-        fotoEditarFile = file;
-        const previewBox = document.getElementById('previewEditFoto');
-        const iconCamara = document.getElementById('iconEditCamara');
-        
-        if (previewBox) {
-            const reader = new FileReader();
-            reader.onload = (evt) => {
-                previewBox.innerHTML = `<img src="${evt.target.result}" alt="Preview" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">`;
-            };
-            reader.readAsDataURL(file);
-        }
-        if (iconCamara) iconCamara.style.display = 'none';
+        procesarFotoSeleccionada(file);
     });
+}
+
+// Procesar foto elegida de galería
+if (editFotoGaleriaInput) {
+    editFotoGaleriaInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        procesarFotoSeleccionada(file);
+    });
+}
+
+// Función auxiliar para procesar la foto seleccionada (cámara o galería)
+function procesarFotoSeleccionada(file) {
+    fotoEditarFile = file;
+    const previewBox = document.getElementById('previewEditFoto');
+    const iconCamara = document.getElementById('iconEditCamara');
+    
+    if (previewBox) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            previewBox.innerHTML = `<img src="${evt.target.result}" alt="Preview" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">`;
+        };
+        reader.readAsDataURL(file);
+    }
+    if (iconCamara) iconCamara.style.display = 'none';
 }
 
 // Guardar cambios o crear nuevo bus (Unificado)
