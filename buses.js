@@ -599,54 +599,108 @@ const btnElegirFoto = document.getElementById('btnElegirFoto');
 const editFotoInput = document.getElementById('editFoto');
 const editFotoGaleriaInput = document.getElementById('editFotoGaleria');
 
+// MANEJO DE BOTONES TOMAR FOTO Y ELEGIR GALERÍA (Protegidos)
 if (btnTomarFoto) {
     btnTomarFoto.addEventListener('click', (e) => {
         e.preventDefault();
-        editFotoInput.setAttribute('capture', 'environment');
-        editFotoInput.click();
+        e.stopPropagation();
+        if (editFotoInput) {
+            editFotoInput.setAttribute('capture', 'environment');
+            editFotoInput.click();
+        }
     });
 }
 
 if (btnElegirFoto) {
     btnElegirFoto.addEventListener('click', (e) => {
         e.preventDefault();
-        editFotoGaleriaInput.removeAttribute('capture');
-        editFotoGaleriaInput.click();
+        e.stopPropagation();
+        if (editFotoGaleriaInput) {
+            editFotoGaleriaInput.removeAttribute('capture');
+            editFotoGaleriaInput.click();
+        }
     });
 }
 
-// Procesar foto tomada con cámara
+// Escuchadores de cambio en inputs
 if (editFotoInput) {
-    editFotoInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
+    editFotoInput.addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
         if (!file) return;
-        procesarFotoSeleccionada(file);
+        await procesarFotoSeleccionada(file);
     });
 }
 
-// Procesar foto elegida de galería
 if (editFotoGaleriaInput) {
-    editFotoGaleriaInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
+    editFotoGaleriaInput.addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
         if (!file) return;
-        procesarFotoSeleccionada(file);
+        await procesarFotoSeleccionada(file);
     });
 }
 
 // Función auxiliar para procesar la foto seleccionada (cámara o galería)
-function procesarFotoSeleccionada(file) {
-    fotoEditarFile = file;
+async function procesarFotoSeleccionada(file) {
     const previewBox = document.getElementById('previewEditFoto');
     const iconCamara = document.getElementById('iconEditCamara');
-    
-    if (previewBox) {
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-            previewBox.innerHTML = `<img src="${evt.target.result}" alt="Preview" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">`;
-        };
-        reader.readAsDataURL(file);
+
+    try {
+        mostrarToast('Procesando foto...', '');
+        
+        // Comprimimos la imagen antes de asignarla para no saturar la RAM
+        const resultado = await comprimirImagen(file);
+        fotoEditarFile = resultado.file;
+
+        if (previewBox) {
+            previewBox.innerHTML = `<img src="${resultado.dataUrl}" alt="Preview" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">`;
+        }
+        if (iconCamara) iconCamara.style.display = 'none';
+
+    } catch (err) {
+        console.error("Error al procesar imagen:", err);
+        mostrarToast('Error al cargar la foto', 'err');
     }
-    if (iconCamara) iconCamara.style.display = 'none';
+}
+
+// Función para redimensionar y comprimir fotos y evitar descargas/reinicio por falta de RAM
+function comprimirImagen(file, maxWidth = 1024, quality = 0.7) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => {
+            const img = new Image();
+            img.src = e.target.result;
+            img.onload = () => {
+                let width = img.width;
+                let height = img.height;
+
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                canvas.toBlob((blob) => {
+                    if (!blob) {
+                        reject(new Error("Error al comprimir imagen"));
+                        return;
+                    }
+                    const compressedFile = new File([blob], file.name || "foto_bus.jpg", {
+                        type: 'image/jpeg',
+                        lastModified: Date.now()
+                    });
+                    resolve({ file: compressedFile, dataUrl: canvas.toDataURL('image/jpeg', quality) });
+                }, 'image/jpeg', quality);
+            };
+            img.onerror = (err) => reject(err);
+        };
+        reader.onerror = (err) => reject(err);
+    });
 }
 
 // Guardar cambios o crear nuevo bus (Unificado)
