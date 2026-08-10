@@ -14,6 +14,10 @@ let mStockOriginal = 0;
 let mPrecioCompraOriginal = 0;
 let mDescripcionOriginal = "";
 let mPrecioVentaOriginal = 0;
+
+// Variable para el modal de confirmación de borrado
+let mCodigoABorrar = "";
+
 // ===================== UTILIDADES =====================
 
 function formatoMoneda(valor) {
@@ -163,7 +167,6 @@ function renderizarProductos(datos) {
     if (tabla) tabla.innerHTML = htmlTabla;
     if (contenedorMovil) contenedorMovil.innerHTML = htmlMovil;
 }
-
 
 function abrirModalEditar(codigo) {
     const producto = productos.find(p => p.codigo === codigo);
@@ -413,6 +416,110 @@ document.getElementById("btnGuardar").addEventListener("click", async function (
     }
 });
 
+// ============ BORRADO DE PRODUCTOS ============
+
+document.getElementById("btnBorrar").addEventListener("click", function () {
+    if (!mCodigoActual) return;
+    
+    mCodigoABorrar = mCodigoActual;
+    document.getElementById("deleteConfirmOverlay").classList.add("visible-delete");
+});
+
+document.getElementById("btnCancelDelete").addEventListener("click", function () {
+    document.getElementById("deleteConfirmOverlay").classList.remove("visible-delete");
+    mCodigoABorrar = "";
+});
+
+document.getElementById("btnConfirmDelete").addEventListener("click", async function () {
+    if (!mCodigoABorrar) return;
+    
+    const btnConfirm = this;
+    btnConfirm.disabled = true;
+    btnConfirm.innerText = "Eliminando...";
+    
+    try {
+        const producto = productos.find(p => p.codigo === mCodigoABorrar);
+        if (!producto) throw new Error("Producto no encontrado en la lista.");
+        
+        const codigoABorrar = mCodigoABorrar;
+        const stockProducto = Number(producto.stock ?? 0);
+        const fechaActual = new Date().toISOString().split('T')[0];
+        const horaActual = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        
+        // 1. PASO 1: INACTIVAR EN SIIGO
+        btnConfirm.innerText = "Inactivando en Siigo...";
+        
+        try {
+            const respuestaSiigo = await fetch('https://vdlxmajvzdtbewchyowm.supabase.co/functions/v1/smart-endpoint', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'delete',
+                    siigo_id: producto.siigo_id || "",
+                    code: producto.codigo
+                })
+            });
+
+            if (!respuestaSiigo.ok) {
+                const textoError = await respuestaSiigo.text();
+                throw new Error(`Error inactivando en Siigo: ${respuestaSiigo.status} - ${textoError}`);
+            }
+
+            const resultadoSiigo = await respuestaSiigo.json();
+            if (!resultadoSiigo.success) {
+                throw new Error(resultadoSiigo.error || "Siigo rechazó la inactivación.");
+            }
+
+        } catch (errorSiigo) {
+            console.error("Error de Siigo:", errorSiigo);
+            throw errorSiigo;
+        }
+        
+        // 2. PASO 2: CREAR SALIDA DE BODEGA SI TIENE STOCK
+        if (stockProducto > 0) {
+            btnConfirm.innerText = "Registrando salida de bodega...";
+            
+            const { error: errSalida } = await supabaseClient
+                .from("salidas_bodega")
+                .insert([{
+                    fecha: fechaActual,
+                    codigo: codigoABorrar,
+                    cantidad: stockProducto,
+                    hora: horaActual,
+                    recibe: "ELIMINACIÓN DE PRODUCTO",
+                    tipo: "E",
+                    bus: ""
+                }]);
+            
+            if (errSalida) throw new Error(`Error al crear salida de bodega: ${errSalida.message}`);
+        }
+        
+        // 3. PASO 3: ELIMINAR EL PRODUCTO DE LA BD
+        btnConfirm.innerText = "Eliminando de base de datos...";
+        
+        const { error: errDelete } = await supabaseClient
+            .from("productos")
+            .delete()
+            .eq("codigo", codigoABorrar);
+        
+        if (errDelete) throw new Error(`Error al eliminar producto: ${errDelete.message}`);
+        
+        // 4. ÉXITO
+        document.getElementById("deleteConfirmOverlay").classList.remove("visible-delete");
+        cerrarModal();
+        await cargarProductos();
+        mostrarToast("Producto eliminado correctamente", "success");
+        
+    } catch (error) {
+        console.error("Error en proceso de eliminación:", error);
+        mostrarToast(error.message || "Error al eliminar el producto", "error");
+    } finally {
+        btnConfirm.disabled = false;
+        btnConfirm.innerText = "Eliminar";
+        mCodigoABorrar = "";
+    }
+});
+
 document.getElementById("btnCerrarModal").addEventListener("click", cerrarModal);
 document.getElementById("btnCancelar").addEventListener("click", cerrarModal);
 
@@ -467,6 +574,7 @@ document.getElementById("txtBuscar").addEventListener("input", function () {
         renderizarProductos(filtrados);
     }, 150);
 });
+
 // ===================== MÓDULO: AGREGAR PRODUCTO ======================
 const TAMANOS_PULGADA = [
     { label: "5/16", codigo: "01" },
@@ -608,7 +716,7 @@ function obtenerCodigoCategoria(categoria) {
 function obtenerCodigoSubcategoria(categoria, subcategoria) {
     const categoriaNorm = normalizarBusqueda(categoria);
     const subNorm = normalizarBusqueda(subcategoria);
-const fila = subcategoriasCache.find(s =>
+    const fila = subcategoriasCache.find(s =>
         normalizarBusqueda(s.categorias) === categoriaNorm &&
         normalizarBusqueda(s.subcategoria) === subNorm
     );
@@ -783,7 +891,7 @@ function limpiarFormularioAgregar(parcial) {
             inputCat.value = "";
             inputCat.disabled = false;
         }
-const inputSub = document.getElementById("addSubcategoria");
+        const inputSub = document.getElementById("addSubcategoria");
         if (inputSub) {
             inputSub.value = "";
             inputSub.disabled = true;

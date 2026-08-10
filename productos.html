@@ -287,13 +287,13 @@
             box-shadow: 0 0 0 3px rgba(40, 75, 135, 0.15);
         }
 
-.form-control:disabled {
+        .form-control:disabled {
             background: #f1f5f9;
             color: #94a3b8;
             cursor: not-allowed;
         }
 
-/* ── DROPDOWN PREDICTIVOS ── */
+        /* ── DROPDOWN PREDICTIVOS ── */
         .dropdown-predictivo {
             display: none;
             background: white;
@@ -402,6 +402,20 @@
             cursor: not-allowed;
         }
 
+        .btn-peligro {
+            background: #dc2626;
+            color: white;
+        }
+
+        .btn-peligro:hover {
+            background: #b91c1c;
+        }
+
+        .btn-peligro:disabled {
+            background: #f87171;
+            cursor: not-allowed;
+        }
+
         /* ➕ FAB - Botón flotante agregar producto */
         .fab-agregar {
             position: fixed;
@@ -498,6 +512,81 @@
 
         .btn-copiar.copiado {
             background: #064e3b;
+        }
+
+        /* ─── MODAL CONFIRMACIÓN BORRADO ─── */
+        .modal-delete-confirm {
+            background: white;
+            width: 100%;
+            max-width: 420px;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            z-index: 110;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .modal-overlay.visible-delete {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-overlay.visible-delete .modal-delete-confirm {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .delete-confirm-body {
+            padding: 28px;
+            text-align: center;
+        }
+
+        .delete-confirm-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .delete-confirm-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #dc2626;
+            margin-bottom: 8px;
+        }
+
+        .delete-confirm-message {
+            font-size: 15px;
+            color: #64748b;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .delete-confirm-warning {
+            font-size: 14px;
+            color: #dc2626;
+            background: #fef2f2;
+            border-left: 3px solid #dc2626;
+            padding: 12px;
+            margin: 16px 0;
+            border-radius: 6px;
+            text-align: left;
+        }
+
+        .delete-confirm-footer {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .delete-confirm-footer .btn {
+            flex: 1;
+            padding: 12px 16px;
+            font-size: 15px;
         }
 
         /* 📱 VISTA CELULAR (MENOS DE 768px) */
@@ -658,10 +747,15 @@
                 font-size: 28px;
             }
 
-.modal-content {
+            .modal-content {
                 width: 100%;
                 max-height: 90vh;
                 border-radius: 16px 16px 0 0;
+            }
+
+            .modal-delete-confirm {
+                width: 90%;
+                max-width: 380px;
             }
         }
     </style>
@@ -762,8 +856,29 @@
                 </div>
             </div>
             <div class="modal-footer">
+                <button class="btn btn-peligro" id="btnBorrar">Eliminar Producto</button>
                 <button class="btn btn-secundario" id="btnCancelar">Cancelar</button>
                 <button class="btn btn-primario" id="btnGuardar">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ❌ MODAL: CONFIRMACIÓN BORRADO -->
+    <div class="modal-overlay" id="deleteConfirmOverlay">
+        <div class="modal-delete-confirm">
+            <div class="delete-confirm-body">
+                <div class="delete-confirm-icon">⚠️</div>
+                <div class="delete-confirm-title">¿Eliminar producto?</div>
+                <div class="delete-confirm-message">
+                    Estás a punto de eliminar permanentemente este producto.
+                </div>
+                <div class="delete-confirm-warning">
+                    Si el producto tiene stock, se creará una salida de bodega automáticamente.
+                </div>
+                <div class="delete-confirm-footer">
+                    <button class="btn btn-secundario" id="btnCancelDelete">Cancelar</button>
+                    <button class="btn btn-peligro" id="btnConfirmDelete">Eliminar</button>
+                </div>
             </div>
         </div>
     </div>
@@ -777,7 +892,7 @@
             </div>
             <div class="modal-body">
 
-<div class="form-row">
+                <div class="form-row">
                     <div class="form-group">
                         <label for="addCategoria">Categoría</label>
                         <input type="text" id="addCategoria" class="form-control" placeholder="Buscar o escribir categoría..." autocomplete="off">
@@ -823,7 +938,7 @@
                     </div>
                 </div>
 
-<div class="form-row">
+                <div class="form-row">
                     <div class="form-group">
                         <label for="addPrecioCompra">Precio Compra</label>
                         <input type="text" id="addPrecioCompra" class="form-control">
