@@ -68,7 +68,7 @@ async function inicializarBuses() {
                 .select("id, fecha, bus, placa, cliente, estado, foto"),
             supabaseClient.from("salidas").select("id, fecha, codigo, cantidad, hora, recibe, tipo, bus"),
             supabaseClient.from("productos").select("codigo, descripcion, precio_venta"),
-            supabaseClient.from("trabajos").select("id, FECHA, N_BUS, TRABAJO, PLACA, tecnico")
+            supabaseClient.from("trabajos").select("id, FECHA, TRABAJO, tecnico, bus_id")
         ]);
         console.timeEnd("⚡ Carga Paralela Supabase");
 
@@ -128,20 +128,16 @@ function renderizarBuses(datosBuses = null) {
 
     const trabajosPorBus = {};
     listaTrabajos.forEach(t => {
-        const llaveBus = String(t.N_BUS || "").trim();
-        const llavePlaca = String(t.PLACA || "").trim();
+        const llaveBus = String(t.bus_id || "").trim();
         if (llaveBus) {
             if (!trabajosPorBus[llaveBus]) trabajosPorBus[llaveBus] = [];
             trabajosPorBus[llaveBus].push(t);
-        } else if (llavePlaca) {
-            if (!trabajosPorBus[llavePlaca]) trabajosPorBus[llavePlaca] = [];
-            trabajosPorBus[llavePlaca].push(t);
         }
     });
 
     datosBuses.forEach(vehiculo => {
         const salidasDelBus = (salidasPorBus[vehiculo.id] || []).concat(salidasPorBus[vehiculo.bus] || []);
-        const trabajosDelBus = (trabajosPorBus[vehiculo.bus] || []).concat(trabajosPorBus[vehiculo.placa] || []);
+        const trabajosDelBus = trabajosPorBus[vehiculo.id] || [];
         
         let totalAcumulado = 0;
         let tablaSalidasHtml = "";
@@ -422,7 +418,7 @@ function prepararYRedireccionarFacturacion(idBus, nombreBus, placaBus) {
         if (!vehiculo) return;
 
         const salidasDelBus = listaSalidas.filter(s => String(s.bus) === String(idBus) || String(s.bus) === String(vehiculo.bus));
-        const trabajosDelBus = listaTrabajos.filter(t => String(t.N_BUS) === String(vehiculo.bus) || String(t.PLACA) === String(vehiculo.placa));
+        const trabajosDelBus = listaTrabajos.filter(t => String(t.bus_id) === String(vehiculo.id));
 
         const itemsSalidas = salidasDelBus.map(salida => {
             const prodReferencia = mapaProductos.get(salida.codigo);
@@ -599,7 +595,6 @@ const btnElegirFoto = document.getElementById('btnElegirFoto');
 const editFotoInput = document.getElementById('editFoto');
 const editFotoGaleriaInput = document.getElementById('editFotoGaleria');
 
-// MANEJO DE BOTONES TOMAR FOTO Y ELEGIR GALERÍA (Protegidos)
 if (btnTomarFoto) {
     btnTomarFoto.addEventListener('click', (e) => {
         e.preventDefault();
@@ -622,7 +617,6 @@ if (btnElegirFoto) {
     });
 }
 
-// Escuchadores de cambio en inputs
 if (editFotoInput) {
     editFotoInput.addEventListener('change', async (e) => {
         const file = e.target.files && e.target.files[0];
@@ -639,7 +633,6 @@ if (editFotoGaleriaInput) {
     });
 }
 
-// Función auxiliar para procesar la foto seleccionada (cámara o galería)
 async function procesarFotoSeleccionada(file) {
     const previewBox = document.getElementById('previewEditFoto');
     const iconCamara = document.getElementById('iconEditCamara');
@@ -647,7 +640,6 @@ async function procesarFotoSeleccionada(file) {
     try {
         mostrarToast('Procesando foto...', '');
         
-        // Comprimimos la imagen antes de asignarla para no saturar la RAM
         const resultado = await comprimirImagen(file);
         fotoEditarFile = resultado.file;
 
@@ -662,7 +654,6 @@ async function procesarFotoSeleccionada(file) {
     }
 }
 
-// Función para redimensionar y comprimir fotos y evitar descargas/reinicio por falta de RAM
 function comprimirImagen(file, maxWidth = 1024, quality = 0.7) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -703,7 +694,6 @@ function comprimirImagen(file, maxWidth = 1024, quality = 0.7) {
     });
 }
 
-// Guardar cambios o crear nuevo bus (Unificado)
 const btnConfirmarEdicion = document.getElementById('btnConfirmarEdicion');
 if (btnConfirmarEdicion) {
     btnConfirmarEdicion.addEventListener('click', async () => {
@@ -870,7 +860,6 @@ async function archivarBusDesdeMenu() {
     }
 }
 
-// Modal personalizado de confirmación (Archivar/Desarchivar)
 function confirmarArchivarUI(mensaje) {
     return new Promise((resolve) => {
         let modal = document.getElementById('modalConfirmarArchivar');

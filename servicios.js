@@ -9,6 +9,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 // ── CONFIGURACIÓN GEMINI IA ──
 const GEMINI_API_KEY = 'AQ.Ab8RN6Ji4Fv4g2m_zGByTvDSuvIrkvXI1R-Fq1-hDmVMQcLJkw'; 
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${GEMINI_API_KEY}`;
+
 // ── ESTADO GLOBAL ──
 let todosTrabajos   = []; 
 let todosServicios  = []; 
@@ -79,7 +80,7 @@ async function cargarTrabajos() {
     console.log("📋 [SUPABASE] Solicitando tabla 'trabajos'...");
     const { data, error } = await sb
         .from('trabajos')
-        .select('*')
+        .select('id, FECHA, TRABAJO, tecnico, bus_id')
         .order('FECHA', { ascending: false })
         .order('id', { ascending: false });
 
@@ -98,13 +99,16 @@ function renderizarTodo(filtro = '') {
     let lista = todosTrabajos;
 
     if (txt) {
-        lista = lista.filter(t => 
-            (t.TRABAJO || '').toLowerCase().includes(txt) ||
-            (t.PLACA   || '').toLowerCase().includes(txt) ||
-            (t.N_BUS   || '').toLowerCase().includes(txt) ||
-            (t.tecnico || '').toLowerCase().includes(txt) ||
-            (t.CLIENTE || '').toLowerCase().includes(txt)
-        );
+        lista = lista.filter(t => {
+            const busObj = todosBuses.find(b => String(b.id) === String(t.bus_id)) || {};
+            return (
+                (t.TRABAJO || '').toLowerCase().includes(txt) ||
+                (t.tecnico || '').toLowerCase().includes(txt) ||
+                (busObj.placa || '').toLowerCase().includes(txt) ||
+                (busObj.bus || '').toLowerCase().includes(txt) ||
+                (busObj.cliente || '').toLowerCase().includes(txt)
+            );
+        });
     }
 
     const grupos = agruparPorFecha(lista);
@@ -180,16 +184,17 @@ function renderPC(grupos) {
         tbody.appendChild(trGrupo);
 
         filas.forEach(t => {
+            const busObj = todosBuses.find(b => String(b.id) === String(t.bus_id)) || {};
             const tr = document.createElement('tr');
             tr.dataset.id = t.id;
             tr.style.cursor = 'pointer';
 
             tr.innerHTML = `
-                <td class="col-bus"><strong>${t.PLACA || ''}</strong> ${t.N_BUS ? '— ' + t.N_BUS : ''}</td>
+                <td class="col-bus"><strong>${busObj.placa || '—'}</strong> ${busObj.bus ? '— ' + busObj.bus : ''}</td>
                 <td class="col-trabajo">${t.TRABAJO || '—'}</td>
                 <td class="col-tecnico">${t.tecnico || '—'}</td>
-                <td class="col-cliente">${t.CLIENTE || '—'}</td>
-                <td class="col-empresa">${t.EMPRESA || '—'}</td>`;
+                <td class="col-cliente">${busObj.cliente || '—'}</td>
+                <td class="col-empresa">—</td>`;
 
             tr.addEventListener('click', e => abrirMenuContextual(e, t));
             tbody.appendChild(tr);
@@ -218,6 +223,7 @@ function renderMobile(grupos) {
         grupo.appendChild(header);
 
         filas.forEach(t => {
+            const busObj = todosBuses.find(b => String(b.id) === String(t.bus_id)) || {};
             const card = document.createElement('div');
             card.style.cssText = 'background:white;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:10px;cursor:pointer;';
             card.dataset.id = t.id;
@@ -226,11 +232,11 @@ function renderMobile(grupos) {
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
                     <div style="flex:1;">
                         <div style="font-weight:bold;color:#203764;margin-bottom:4px;">${t.TRABAJO || 'Sin descripción'}</div>
-                        <div style="font-size:12px;color:#64748b;margin-bottom:4px;">🚌 ${t.PLACA || ''} ${t.N_BUS ? '— Bus: ' + t.N_BUS : ''}</div>
+                        <div style="font-size:12px;color:#64748b;margin-bottom:4px;">🚌 ${busObj.placa || ''} ${busObj.bus ? '— Bus: ' + busObj.bus : ''}</div>
                         <div style="font-size:12px;color:#64748b;">Técnico: ${t.tecnico || '—'}</div>
                     </div>
                     <div style="text-align:right;font-size:12px;color:#64748b;">
-                        <div>${t.CLIENTE || ''}</div>
+                        <div>${busObj.cliente || ''}</div>
                     </div>
                 </div>`;
 
@@ -255,7 +261,7 @@ function bindUI() {
     const btnIA = document.getElementById('btnProcesarIA');
     if (btnIA) {
         btnIA.addEventListener('click', async (e) => {
-            e.preventDefault(); // Evita recarga de página
+            e.preventDefault();
             console.log("🤖 Click en botón Procesar IA");
             const texto = prompt('Ingresa o dicta el reporte de trabajo para la IA:');
             console.log("📝 Texto ingresado en prompt:", texto);
@@ -286,8 +292,11 @@ function bindUI() {
         inputServ.addEventListener('keydown', e => {
             if (e.key === 'Enter') {
                 e.preventDefault();
+                e.stopPropagation();
+
                 const drop = document.getElementById('dropdownServicios');
                 if (drop) drop.style.display = 'none';
+                
                 agregarItemPendiente();
             }
         });
@@ -302,7 +311,7 @@ function bindUI() {
 
     const btnConfirmar = document.getElementById('btnConfirmar');
     if (btnConfirmar) {
-        btnConfirmar.addEventListener('click', confirmarSalidas);
+        btnConfirmar.onclick = confirmarSalidas;
     }
 }
 
@@ -328,8 +337,9 @@ function abrirSheet(trabajoEditar = null) {
         document.getElementById('sheetTitulo').textContent = 'Editar Trabajo';
         if (inputTec) inputTec.value = trabajoEditar.tecnico || '';
 
-        const busObj = todosBuses.find(b => b.placa === trabajoEditar.PLACA || b.bus === trabajoEditar.N_BUS);
-        if (busObj && selBus) selBus.value = busObj.id;
+        if (selBus && trabajoEditar.bus_id) {
+            selBus.value = trabajoEditar.bus_id;
+        }
 
         const servObj = todosServicios.find(s => s.descripcion === trabajoEditar.TRABAJO || s.codigo === trabajoEditar.TRABAJO);
         if (servObj) {
@@ -513,8 +523,8 @@ async function confirmarSalidas() {
     }
 
     const inputTec = document.getElementById('inputTecnico');
-    const tecnico  = inputTec ? inputTec.value.trim() : '';
-    const idBus    = document.getElementById('selBus').value;
+    const tecnico   = inputTec ? inputTec.value.trim() : '';
+    const idBus     = document.getElementById('selBus').value;
 
     if (!idBus) {
         mostrarToast('Selecciona el bus', 'err');
@@ -548,12 +558,9 @@ async function confirmarSalidas() {
         for (const item of itemsPendientes) {
             const { error: errInsert } = await sb.from('trabajos').insert({
                 FECHA:   hoy,
-                CLIENTE: busObj.cliente ? busObj.cliente.toUpperCase() : null,
-                EMPRESA: null,
-                N_BUS:   busObj.bus     ? busObj.bus.toUpperCase()     : null,
-                PLACA:   busObj.placa   ? busObj.placa.toUpperCase()   : null,
                 TRABAJO: item.descripcion ? item.descripcion.toUpperCase() : null,
-                tecnico: tecnico         ? tecnico.toUpperCase()         : null
+                tecnico: tecnico          ? tecnico.toUpperCase()          : null,
+                bus_id:  String(busObj.id)
             });
 
             if (errInsert) throw errInsert;
@@ -666,7 +673,10 @@ async function eliminarSalidaDesdeMenu() {
     if (!trabajoEnContexto) return;
 
     const t = trabajoEnContexto;
-    const verificado = await confirmarEliminacionUI(`Se eliminará la tarea "${t.TRABAJO}" asignada al bus ${t.PLACA || t.N_BUS}.`);
+    const busObj = todosBuses.find(b => String(b.id) === String(t.bus_id)) || {};
+    const busRef = busObj.placa || busObj.bus || 'asignado';
+
+    const verificado = await confirmarEliminacionUI(`Se eliminará la tarea "${t.TRABAJO}" asignada al bus ${busRef}.`);
     if (!verificado) return;
 
     try {
@@ -704,7 +714,6 @@ function mostrarToast(msg, tipo = '') {
 function construirSystemPromptIA() {
     const catalogoServicios = todosServicios.map(s => `${s.codigo}: ${s.descripcion}`).join('\n');
     
-    // Cambiamos para mostrar claramente el ID como texto exacto
     const catalogoBuses = todosBuses.map(b => 
         `ID: "${b.id}" | Placa: ${b.placa} | Identificador/Bus: ${b.bus} | Cliente: ${b.cliente || 'N/A'}`
     ).join('\n');
@@ -717,13 +726,13 @@ ${catalogoServicios}
 BUSES REGISTRADOS EN TALLER (ACTIVOS):
 ${catalogoBuses}
 
-INSTRUCCIONES CRÍTICAS PARA EL BUS:
-1. Analiza el reporte del técnico e identifica a qué bus se refiere (puede usar la placa, el número interno del bus, o nombres descriptivos como "bus de prueba", "el de prueba", etc.).
-2. Devuelve "id_bus" exactamente con el valor completo del campo ID que aparece entre comillas en la lista (ej: "BUS-1784995292581"). Si no logras identificarlo con certeza, devuelve null.
-3. Extrae el nombre del técnico responsable en "tecnico" (string o null).
+INSTRUCCIONES CRÍTICAS:
+1. Analiza el reporte del técnico e identifica a qué bus se refiere (puede usar la placa, el número interno del bus, o un nombre descriptivo).
+2. Devuelve "bus_id" con el valor exacto del campo ID de la lista (ej: "BUS-1784995292581"). Si no lo identificas, devuelve null.
+3. Extrae el nombre del técnico responsable en "tecnico" (string en MAYÚSCULAS o null).
 4. Extrae la lista de tareas en "servicios":
-   - Si la tarea coincide con un servicio del catálogo, usa EXACTAMENTE su descripción y código.
-   - Si es un trabajo custom o no está en el catálogo, asigna "codigo": null y escribe la "descripcion" en MAYÚSCULAS.`;
+   - Si coincide con el catálogo, usa EXACTAMENTE su código y su descripción.
+   - Si es un trabajo personalizado, asigna "codigo": null y escribe la "descripcion" en MAYÚSCULAS.`;
 }
 
 // ── FUNCIÓN DE PROCESAMIENTO AUTOMÁTICO DE IA ──
@@ -738,7 +747,7 @@ async function procesarTextoConIA(textoReporte) {
                 {
                     parts: [
                         { text: systemPrompt },
-                        { text: `Reporte del técnico: "${textoReporte}"\n\nDevuelve exclusivamente un objeto JSON válido con las claves: id_bus (string exacto con el ID del bus entre comillas de la lista o null), tecnico (string o null), y servicios (array de objetos con codigo y descripcion). No incluyas markdown ni bloques de código de ningún tipo en la respuesta, solo el JSON plano.` }
+                        { text: `Reporte del técnico: "${textoReporte}"\n\nDevuelve exclusivamente un objeto JSON válido con las claves: bus_id (string exacto o null), tecnico (string o null), y servicios (array de objetos con codigo y descripcion). No incluyas markdown ni bloques de código, solo el JSON plano.` }
                     ]
                 }
             ],
@@ -768,53 +777,12 @@ async function procesarTextoConIA(textoReporte) {
             return;
         }
 
-        // Buscar el bus por ID exacto, o respaldar buscando por placa/número si la IA falló
-        let busObj = todosBuses.find(b => String(b.id) === String(resultadoIA.id_bus));
-        
-        if (!busObj && (resultadoIA.placa || resultadoIA.n_bus)) {
-            const p = (resultadoIA.placa || '').toUpperCase();
-            const nb = (resultadoIA.n_bus || '').toUpperCase();
-            busObj = todosBuses.find(b => 
-                (p && b.placa && b.placa.toUpperCase() === p) ||
-                (nb && b.bus && b.bus.toUpperCase() === nb)
-            );
-        }
-        
-        if (!busObj) {
-            console.warn("⚠️ Bus devuelto por la IA no encontrado:", resultadoIA);
-            mostrarToast('No se encontró el bus especificado por la IA', 'err');
-            return;
-        }
-
-        mostrarToast('Guardando automáticamente...', '');
-        const hoy = fechaHoy();
-        const tecnicoAsignado = resultadoIA.tecnico ? resultadoIA.tecnico.toUpperCase() : null;
-
-        // Insertar cada servicio extraído directamente en Supabase
-        for (const item of resultadoIA.servicios) {
-            const { error: errInsert } = await sb.from('trabajos').insert({
-                FECHA:   hoy,
-                CLIENTE: busObj.cliente ? busObj.cliente.toUpperCase() : null,
-                EMPRESA: null,
-                N_BUS:   busObj.bus     ? busObj.bus.toUpperCase()     : null,
-                PLACA:   busObj.placa   ? busObj.placa.toUpperCase()   : null,
-                TRABAJO: item.descripcion ? item.descripcion.toUpperCase() : null,
-                tecnico: tecnicoAsignado
-            });
-
-            if (errInsert) throw errInsert;
-        }
-
-        // Actualizar la interfaz y recargar la tabla principal
-        await cargarTrabajos();
-        const txtBuscar = document.getElementById('txtBuscar')?.value || '';
-        renderizarTodo(txtBuscar);
-        
-        mostrarToast('¡Reporte procesado y guardado con éxito!', 'ok');
+        verificarYAplicarResultadoIA(resultadoIA);
+        mostrarToast('Reporte procesado. Revisa y confirma los datos.', 'ok');
 
     } catch (err) {
         console.error('❌ Error en automatización IA:', err);
-        mostrarToast('Error al automatizar: ' + (err.message || 'Error desconocido'), 'err');
+        mostrarToast('Error al procesar con IA: ' + (err.message || 'Error desconocido'), 'err');
     }
 }
 
@@ -831,25 +799,14 @@ function verificarYAplicarResultadoIA(datosIA) {
 
     abrirSheet();
 
-    // 1. Asignación del Bus
+    // 1. Asignación del Bus por bus_id
     const selBus = document.getElementById('selBus');
     if (selBus) {
-        if (datosIA.id_bus) {
-            console.log(`🎯 Coincidencia directa por id_bus: ${datosIA.id_bus}`);
-            selBus.value = datosIA.id_bus;
-        } else if (datosIA.placa || datosIA.n_bus) {
-            const p = (datosIA.placa || '').toUpperCase();
-            const nb = (datosIA.n_bus || '').toUpperCase();
-            const busEncontrado = todosBuses.find(b => 
-                (p && b.placa && b.placa.toUpperCase() === p) ||
-                (nb && b.bus && b.bus.toUpperCase() === nb)
-            );
-            if (busEncontrado) {
-                console.log(`🎯 Bus encontrado por coincidencia de placa/número:`, busEncontrado);
-                selBus.value = busEncontrado.id;
-            } else {
-                console.warn("⚠️ No se encontró coincidencia de bus en la lista abierta.");
-            }
+        if (datosIA.bus_id) {
+            console.log(`🎯 Coincidencia directa por bus_id: ${datosIA.bus_id}`);
+            selBus.value = datosIA.bus_id;
+        } else {
+            console.warn("⚠️ No se proporcionó bus_id válido desde la IA.");
         }
     } else {
         console.warn("⚠️ Elemento HTML '#selBus' no encontrado en el DOM");
